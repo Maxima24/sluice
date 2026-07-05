@@ -1,0 +1,93 @@
+// Fiber Liquidity Layer — Prisma schema.
+//
+// These tables are RECORDS and reconciliation checks — never authoritative over
+// channel state. The Fiber node is the source of truth for balances (hard rule #2).
+//
+// Amounts are CKB u128 values (max 39 digits) stored as NUMERIC(40,0) via the
+// Prisma `Decimal @db.Decimal(40, 0)` attribute — lossless, never JS number.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SnapshotSource {
+  BOOT
+  POLL
+  EVENT
+  MANUAL
+}
+
+enum RebalanceStatus {
+  PENDING
+  BUILDING
+  INFLIGHT
+  SUCCEEDED
+  FAILED
+}
+
+enum LedgerDirection {
+  OUTBOUND
+  INBOUND
+}
+
+enum LedgerEntryType {
+  PRINCIPAL
+  FEE
+}
+
+/// A point-in-time record of a channel's balances, read from the node.
+model ChannelSnapshot {
+  id                   String         @id @default(cuid())
+  channelId            String
+  peerPubkey           String
+  stateName            String
+  localBalance         Decimal        @db.Decimal(40, 0) // our OUTBOUND capacity
+  remoteBalance        Decimal        @db.Decimal(40, 0) // INBOUND capacity
+  capacity             Decimal        @db.Decimal(40, 0)
+  isUdt                Boolean        @default(false)
+  fundingUdtTypeScript Json?
+  source               SnapshotSource
+  capturedAt           DateTime       @default(now())
+
+  @@index([channelId, capturedAt])
+  @@map("channel_snapshot")
+}
+
+/// A rebalance the tool executed (Step 6). Idempotency-keyed; concurrency-safe.
+model RebalanceJob {
+  id              String          @id @default(cuid())
+  idempotencyKey  String          @unique
+  sourceChannelId String
+  destChannelId   String
+  amount          Decimal         @db.Decimal(40, 0)
+  maxFee          Decimal         @db.Decimal(40, 0)
+  status          RebalanceStatus @default(PENDING)
+  paymentHash     String?
+  feePaid         Decimal?        @db.Decimal(40, 0)
+  router          Json?
+  error           String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  ledgerEntries   LedgerEntry[]
+
+  @@map("rebalance_job")
+}
+
+/// Double-entry audit record of what a rebalance did (Step 6). Never a balance authority.
+model LedgerEntry {
+  id             String          @id @default(cuid())
+  rebalanceJobId String
+  job            RebalanceJob    @relation(fields: [rebalanceJobId], references: [id])
+  channelId      String
+  direction      LedgerDirection
+  entryType      LedgerEntryType
+  amount         Decimal         @db.Decimal(40, 0)
+  createdAt      DateTime        @default(now())
+
+  @@index([rebalanceJobId])
+  @@map("ledger_entry")
+}

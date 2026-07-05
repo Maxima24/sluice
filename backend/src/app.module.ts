@@ -1,0 +1,30 @@
+import { Module } from '@nestjs/common';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+
+import { ConfigModule } from './config/config.module';
+import { PrismaModule } from './infrastructure/prisma/prisma.module';
+import { FiberRpcModule } from './infrastructure/fiber-rpc/fiber-rpc.module';
+import { NodeModule } from './modules/node/node.module';
+import { ChannelsModule } from './modules/channels/channels.module';
+
+import { AppController } from './app.controller';
+import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
+import { DashboardSecretGuard } from './common/guards/dashboard-secret.guard';
+
+@Module({
+  imports: [
+    // Infrastructure spine
+    ConfigModule,
+    PrismaModule,
+    FiberRpcModule,
+    // Bounded contexts (= future microservices)
+    NodeModule,
+    ChannelsModule,
+  ],
+  controllers: [AppController],
+  providers: [
+    { provide: APP_INTERCEPTOR, useClass: TransformResponseInterceptor },
+    { provide: APP_GUARD, useClass: DashboardSecretGuard },
+  ],
+})
+export class AppModule {}
