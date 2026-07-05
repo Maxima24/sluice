@@ -10,6 +10,7 @@ import { RealtimeModule } from './modules/realtime/realtime.module';
 import { RoutingModule } from './modules/routing/routing.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
 import { RebalanceModule } from './modules/rebalance/rebalance.module';
+import { ReconciliationModule } from './modules/reconciliation/reconciliation.module';
 
 import { AppController } from './app.controller';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
@@ -28,6 +29,7 @@ import { DashboardSecretGuard } from './common/guards/dashboard-secret.guard';
     RoutingModule,
     LedgerModule,
     RebalanceModule,
+    ReconciliationModule,
   ],
   controllers: [AppController],
   providers: [
