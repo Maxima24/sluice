@@ -1,0 +1,36 @@
+# Local dev dependencies for the backend: Postgres + Redis.
+#
+#   docker compose -f infra/docker-compose.deps.yml up -d
+#
+# NOTE: Postgres is published on host port 5433 (not 5432) to avoid colliding
+# with any native Windows Postgres install. The backend .env DATABASE_URL points
+# at 127.0.0.1:5433. Redis (Step 6, BullMQ) is on 6379.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fiber-pg
+    environment:
+      POSTGRES_USER: fiber
+      POSTGRES_PASSWORD: fiber
+      POSTGRES_DB: fiber
+    ports:
+      - "5433:5432"
+    volumes:
+      - fiber-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fiber -d fiber"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: fiber-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - fiber-redis-data:/data
+
+volumes:
+  fiber-pg-data:
+  fiber-redis-data:
