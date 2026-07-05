@@ -7,6 +7,13 @@ import type { NodeInfoResult } from './types/node-info';
 import type { ListChannelsParams, ListChannelsResult } from './types/channels';
 import type { GraphChannelsParams, GraphChannelsResult } from './types/graph';
 import type { ListPeersResult } from './types/peers';
+import type {
+  SendPaymentParams,
+  SendPaymentResponse,
+  SendPaymentWithRouterParams,
+  BuildRouterParams,
+  BuildRouterResult,
+} from './types/payments';
 
 /**
  * The single seam where raw JSON-RPC over HTTP happens. Every node method is
@@ -52,6 +59,22 @@ export class FiberRpcAdapter implements IFiberRpcClient, OnModuleInit {
 
   listPeers(): Promise<ListPeersResult> {
     return this.call<ListPeersResult>('list_peers');
+  }
+
+  sendPayment(params: SendPaymentParams): Promise<SendPaymentResponse> {
+    return this.call<SendPaymentResponse>('send_payment', [params]);
+  }
+
+  sendPaymentWithRouter(params: SendPaymentWithRouterParams): Promise<SendPaymentResponse> {
+    return this.call<SendPaymentResponse>('send_payment_with_router', [params]);
+  }
+
+  buildRouter(params: BuildRouterParams): Promise<BuildRouterResult> {
+    return this.call<BuildRouterResult>('build_router', [params]);
+  }
+
+  getPayment(paymentHash: string): Promise<SendPaymentResponse> {
+    return this.call<SendPaymentResponse>('get_payment', [{ payment_hash: paymentHash }]);
   }
 
   /**

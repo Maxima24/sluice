@@ -3,6 +3,7 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { WsAdapter } from '@nestjs/platform-ws';
 import helmet from 'helmet';
 
 import { AppModule } from './app.module';
@@ -15,6 +16,7 @@ Prisma.Decimal.set({ precision: 60 });
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.useWebSocketAdapter(new WsAdapter(app)); // raw ws (matches the frontend's native WebSocket)
 
   const config = app.get(AppConfig);
   const logger = new Logger('Bootstrap');

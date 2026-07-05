@@ -2,6 +2,13 @@ import type { NodeInfoResult } from './types/node-info';
 import type { ListChannelsParams, ListChannelsResult } from './types/channels';
 import type { GraphChannelsParams, GraphChannelsResult } from './types/graph';
 import type { ListPeersResult } from './types/peers';
+import type {
+  SendPaymentParams,
+  SendPaymentResponse,
+  SendPaymentWithRouterParams,
+  BuildRouterParams,
+  BuildRouterResult,
+} from './types/payments';
 
 /** DI token for the single, typed adapter to the Fiber node (hard rule #5). */
 export const FIBER_RPC = Symbol('FIBER_RPC');
@@ -15,6 +22,12 @@ export interface IFiberRpcClient {
   listChannels(params?: ListChannelsParams): Promise<ListChannelsResult>;
   graphChannels(params?: GraphChannelsParams): Promise<GraphChannelsResult>;
   listPeers(): Promise<ListPeersResult>;
+
+  // Payments / routing (Steps 5-6). Amounts are u128 hex.
+  sendPayment(params: SendPaymentParams): Promise<SendPaymentResponse>;
+  sendPaymentWithRouter(params: SendPaymentWithRouterParams): Promise<SendPaymentResponse>;
+  buildRouter(params: BuildRouterParams): Promise<BuildRouterResult>;
+  getPayment(paymentHash: string): Promise<SendPaymentResponse>;
 }
 
 export type {
@@ -24,4 +37,9 @@ export type {
   GraphChannelsParams,
   GraphChannelsResult,
   ListPeersResult,
+  SendPaymentParams,
+  SendPaymentResponse,
+  SendPaymentWithRouterParams,
+  BuildRouterParams,
+  BuildRouterResult,
 };

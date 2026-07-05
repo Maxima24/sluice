@@ -1,35 +1,62 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { env } from '@/lib/env';
 
+export interface RealtimeMessage {
+  event: string;
+  data: unknown;
+}
+
 /**
- * Step-4 placeholder for the backend->frontend realtime channel. Opens the WS
- * and logs its lifecycle. In Step 4 this subscribes to `balance-changed` events
- * and drives live bar updates. Safe no-op if NEXT_PUBLIC_WS_URL is unset.
+ * Backend -> frontend realtime channel (path `/realtime`). Reconnects with a
+ * small backoff and parses the `{ event, data }` envelope the RealtimeGateway
+ * sends (e.g. `balance-changed`). Returns the live connection status.
  */
-export function useFiberSocket(onMessage?: (data: unknown) => void) {
-  const ref = useRef<WebSocket | null>(null);
+export function useFiberSocket(onEvent?: (msg: RealtimeMessage) => void) {
+  const [connected, setConnected] = useState(false);
+  const cbRef = useRef(onEvent);
+  cbRef.current = onEvent;
 
   useEffect(() => {
-    const url = env.NEXT_PUBLIC_WS_URL;
-    if (!url) return;
+    const base = env.NEXT_PUBLIC_WS_URL;
+    if (!base) return;
+    const url = `${base.replace(/\/$/, '')}/realtime`;
 
-    let ws: WebSocket;
-    try {
-      ws = new WebSocket(url);
-    } catch {
-      return;
-    }
-    ref.current = ws;
+    let ws: WebSocket | null = null;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let closed = false;
 
-    ws.onopen = () => console.debug('[fiber-ws] open', url);
-    ws.onclose = () => console.debug('[fiber-ws] close');
-    ws.onerror = () => console.debug('[fiber-ws] error');
-    ws.onmessage = (e) => onMessage?.(e.data);
+    const connect = () => {
+      if (closed) return;
+      try {
+        ws = new WebSocket(url);
+      } catch {
+        retry = setTimeout(connect, 3000);
+        return;
+      }
+      ws.onopen = () => setConnected(true);
+      ws.onclose = () => {
+        setConnected(false);
+        if (!closed) retry = setTimeout(connect, 3000);
+      };
+      ws.onerror = () => ws?.close();
+      ws.onmessage = (e) => {
+        try {
+          cbRef.current?.(JSON.parse(String(e.data)) as RealtimeMessage);
+        } catch {
+          /* ignore non-JSON frames */
+        }
+      };
+    };
+    connect();
 
-    return () => ws.close();
-  }, [onMessage]);
+    return () => {
+      closed = true;
+      if (retry) clearTimeout(retry);
+      ws?.close();
+    };
+  }, []);
 
-  return ref;
+  return { connected };
 }
