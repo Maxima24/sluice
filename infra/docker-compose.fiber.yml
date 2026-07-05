@@ -1,0 +1,38 @@
+# CKB Fiber Network node (FNN) — testnet. Third-party image; we only RUN it
+# (no Rust, no forking). P2P on 8228; RPC + WebSocket exposed to the host on 8299.
+#
+#   FIBER_SECRET_KEY_PASSWORD=dev-password \
+#     docker compose -f infra/docker-compose.fiber.yml up -d
+#
+# On first start the entrypoint copies the bundled TESTNET config to
+# /fiber/config.yml (persisted in ./fiber/data) and encrypts the plaintext
+# CKB key at ./fiber/data/ckb/key (create it first — see infra/README.md).
+#
+# WHY THE PROXY: FNN 0.9.x refuses to bind RPC to a public address (0.0.0.0)
+# without biscuit auth. We keep RPC on its secure default 127.0.0.1:8227 inside
+# the container and expose it to the host via a socat sidecar that shares the
+# node's network namespace (host 8299 -> node 127.0.0.1:8227). Biscuit auth is
+# the production-grade alternative (documented as a follow-up).
+services:
+  fiber:
+    image: nervos/fiber:${FIBER_IMAGE_TAG:-0.9.0-rc7}
+    container_name: fiber-node
+    environment:
+      FIBER_SECRET_KEY_PASSWORD: ${FIBER_SECRET_KEY_PASSWORD:-dev-password}
+      RUST_LOG: ${RUST_LOG:-info}
+    ports:
+      - "8228:8228" # P2P
+      - "8299:8299" # RPC/WS reached via the socat sidecar below
+    volumes:
+      - ./fiber/data:/fiber
+    restart: unless-stopped
+
+  # Dev-only: exposes the node's loopback RPC to the host without biscuit auth.
+  fiber-rpc-proxy:
+    image: alpine/socat
+    container_name: fiber-rpc-proxy
+    network_mode: "service:fiber" # share the node's netns -> 127.0.0.1:8227 is the node RPC
+    command: TCP-LISTEN:8299,fork,reuseaddr TCP:127.0.0.1:8227
+    depends_on:
+      - fiber
+    restart: unless-stopped
