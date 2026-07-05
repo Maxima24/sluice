@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.next/
+out/
+build/
+next-env.d.ts
+*.tsbuildinfo
+
+# Prisma generated client
+**/generated/
+backend/prisma/migrations/**/migration_lock.toml.local
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# Fiber node runtime data (never commit wallet keys / chain data)
+infra/fiber/data/
+**/fiber-node/
+
+# Logs / OS / editor
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Test / coverage
+coverage/
