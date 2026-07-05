@@ -1,4 +1,5 @@
 import { serverFetch } from '@/lib/api/client';
+import { LiveStatus } from '@/components/live-status';
 
 interface NodeInfo {
   version: string;
@@ -49,7 +50,10 @@ export default async function Home() {
 
   return (
     <main style={{ maxWidth: 880, margin: '0 auto', padding: '3rem 1.5rem' }}>
-      <h1 style={{ fontSize: '1.6rem', fontWeight: 700 }}>Fiber Liquidity Layer</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <h1 style={{ fontSize: '1.6rem', fontWeight: 700 }}>Fiber Liquidity Layer</h1>
+        <LiveStatus />
+      </div>
       <p style={{ color: 'var(--color-muted)', marginTop: 4 }}>
         Node operability dashboard — base
       </p>

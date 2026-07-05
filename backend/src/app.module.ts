@@ -6,6 +6,7 @@ import { PrismaModule } from './infrastructure/prisma/prisma.module';
 import { FiberRpcModule } from './infrastructure/fiber-rpc/fiber-rpc.module';
 import { NodeModule } from './modules/node/node.module';
 import { ChannelsModule } from './modules/channels/channels.module';
+import { RealtimeModule } from './modules/realtime/realtime.module';
 
 import { AppController } from './app.controller';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
@@ -20,6 +21,7 @@ import { DashboardSecretGuard } from './common/guards/dashboard-secret.guard';
     // Bounded contexts (= future microservices)
     NodeModule,
     ChannelsModule,
+    RealtimeModule,
   ],
   controllers: [AppController],
   providers: [
