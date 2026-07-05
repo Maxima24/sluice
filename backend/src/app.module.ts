@@ -7,6 +7,7 @@ import { FiberRpcModule } from './infrastructure/fiber-rpc/fiber-rpc.module';
 import { NodeModule } from './modules/node/node.module';
 import { ChannelsModule } from './modules/channels/channels.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
+import { RoutingModule } from './modules/routing/routing.module';
 
 import { AppController } from './app.controller';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
@@ -22,6 +23,7 @@ import { DashboardSecretGuard } from './common/guards/dashboard-secret.guard';
     NodeModule,
     ChannelsModule,
     RealtimeModule,
+    RoutingModule,
   ],
   controllers: [AppController],
   providers: [

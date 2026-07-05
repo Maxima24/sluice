@@ -12,3 +12,8 @@ export function u128FromHex(value: U128Hex): bigint {
 export function toNumericString(value: U128Hex): string {
   return u128FromHex(value).toString(10);
 }
+
+/** Decimal (or hex) string -> 0x-hex u128 for node RPC params. */
+export function toU128Hex(value: string): U128Hex {
+  return `0x${BigInt(value).toString(16)}`;
+}
