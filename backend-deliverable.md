@@ -1,21 +1,27 @@
-# Backend Deliverable — Next Steps (Build Order 4–7)
+# Backend Deliverable — Build Order 4–7 (shipped)
 
-Runbook for the remaining **backend** work on the Fiber Liquidity Layer. Each step is
-built as a bounded context in the **canonical layout** and verified **against the real
-testnet node** (not a mock).
+Each remaining backend stage was built as a bounded context in the **canonical layout** and
+verified **against the real testnet node** (0.9.0-rc7), not a mock. Steps 4–7 landed in
+**PR #5** (`feat/steps-4-7`). The runbook detail below documents how each was built.
 
 ## Status
 
 | Step | Scope | State |
 |------|-------|-------|
-| 0 | Testnet FNN node + infra (Docker) | ✅ live (`node_info` verified via socat proxy on `:8299`) |
+| 0 | Testnet FNN node + infra (Docker) | ✅ live (`node_info` via socat proxy on `:8299`) |
 | 1 | Repo + `FiberRpcClient` (`node` context) | ✅ live (`/node/info\|channels\|peers\|graph`) |
 | 2 | Prisma schema + `channels` snapshots/health | ✅ live (`/channels/health`, `source:'live'`) |
-| 3 | Health dashboard | frontend (base scaffolded; bars land in Step 3) |
-| **4** | **Live push (realtime)** | **next** |
-| 5 | "Can I pay?" probe (routing) | pending |
-| 6 | Rebalance engine (worker + ledger) | pending |
-| 7 | Reconciliation | pending |
+| 3 | Health dashboard | frontend base + live `LiveStatus` wired (full bars = Step 3 build-out) |
+| **4** | **Live push (realtime)** | ✅ shipped — WS gateway `/realtime` + interval poller + best-effort node sub |
+| **5** | **"Can I pay?" probe (routing)** | ✅ shipped — `POST /routing/probe` (`send_payment` `dry_run`) |
+| **6** | **Rebalance engine (worker + ledger)** | ✅ shipped — BullMQ, idempotent Serializable txn, balanced double-entry |
+| **7** | **Reconciliation** | ✅ shipped — `GET /reconciliation/status` (node wins on drift) |
+
+> **Funded-channel caveat:** two happy-paths need ≥ 2 funded `ChannelReady` channels to
+> exercise fully — Step 5's `payable:true` + fee + bottleneck and Step 6's successful
+> rebalance + ledger settle. Both are implemented and typecheck; they execute once channels
+> exist (see `infra/README.md §3`). Everything testable without liquidity is verified —
+> including the Step 6 idempotency guarantee (same `idempotencyKey` → same job, one row).
 
 ## Conventions every step must honor
 
@@ -28,6 +34,8 @@ testnet node** (not a mock).
 ---
 
 ## Step 4 — Live push (realtime gateway + node subscription + transform)
+
+> **✅ Shipped** — `src/modules/realtime/` + frontend `useFiberSocket`/`LiveStatus`. Node subscription self-disables on 0.9.0-rc7 (`subscribe_store_changes` → method-not-found); the interval poll carries channel state.
 
 **Goal.** Bars update on their own. Backend is the transform layer between two WebSockets that must never be conflated: **node→backend** (FNN's own subscription) and **backend→frontend** (our push).
 
@@ -58,6 +66,8 @@ modules/realtime/
 
 ## Step 5 — "Can I pay?" probe (routing context; deterministic + safe)
 
+> **✅ Shipped** — `src/modules/routing/`; `FiberRpcClient` gained `send_payment` / `send_payment_with_router` / `build_router` / `get_payment`. Node RPC errors (no route / insufficient liquidity) return `payable:false`; only transport failures 502.
+
 **Goal.** A pre-flight check that answers "can I pay X to Y?" with a fee and the bottleneck hop — **without moving funds**. Safe to demo even before channels/rebalance work.
 
 **New context — `routing`** (read-through; repository wraps `FIBER_RPC`):
@@ -83,6 +93,8 @@ modules/routing/
 ---
 
 ## Step 6 — Rebalance engine (off-request worker; idempotent; double-entry ledger)
+
+> **✅ Shipped** — `src/modules/rebalance/` (BullMQ worker, `RUN_WORKER_INLINE`) + `src/modules/ledger/`. Idempotent Serializable create keyed by `@unique idempotencyKey` (P2002/P2034 retry); balanced double-entry pair + SUCCEEDED update in one serializable txn. A dry-run fee guard aborts over `maxFee` before any funds move.
 
 **Goal.** Self-heal a depleted channel by sending a **circular self-payment** (out an over-funded channel, back in the depleted one), executed **off the request path** with retries, recorded in a **balanced double-entry ledger**. Uses the `rebalance_job` + `ledger_entry` tables (already migrated in Step 2).
 
@@ -121,6 +133,8 @@ modules/ledger/
 ---
 
 ## Step 7 — Reconciliation
+
+> **✅ Shipped** — `src/modules/reconciliation/`; `GET /reconciliation/status` compares the latest snapshot vs a fresh `list_channels`, flags drift, and re-snapshots from the node on drift (node wins; never corrects the node).
 
 **Goal.** Detect and surface **drift** between our latest snapshot and the node's live balances — the node always wins; we flag, we never "correct" the node.
 
