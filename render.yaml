@@ -20,9 +20,11 @@ services:
     #             the WS gateway, and the rebalance worker. Use "starter" for always-on.
     region: oregon
     branch: main
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter backend build
-    startCommand: pnpm --filter backend start:prod
-    preDeployCommand: pnpm --filter backend exec prisma migrate deploy # runs migrations before traffic
+    # Render's /usr/bin is read-only, so `corepack enable` fails (EROFS). Use npx to
+    # fetch pnpm instead. Node is pinned to 22 via .node-version.
+    buildCommand: npx --yes pnpm@9.15.9 install --frozen-lockfile && npx --yes pnpm@9.15.9 --filter backend run build
+    startCommand: cd backend && node dist/main.js
+    preDeployCommand: npx --yes pnpm@9.15.9 --filter backend exec prisma migrate deploy # migrations before traffic
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
