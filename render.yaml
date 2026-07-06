@@ -22,7 +22,8 @@ services:
     branch: main
     # Render's /usr/bin is read-only, so `corepack enable` fails (EROFS). Use npx to
     # fetch pnpm instead. Node is pinned to 22 via .node-version.
-    buildCommand: npx --yes pnpm@9.15.9 install --frozen-lockfile && npx --yes pnpm@9.15.9 --filter backend run build
+    # --prod=false: NODE_ENV=production would otherwise skip devDeps (nest CLI, prisma, tsc) needed to build.
+    buildCommand: npx --yes pnpm@9.15.9 install --frozen-lockfile --prod=false && npx --yes pnpm@9.15.9 --filter backend run build
     startCommand: cd backend && node dist/main.js
     preDeployCommand: npx --yes pnpm@9.15.9 --filter backend exec prisma migrate deploy # migrations before traffic
     healthCheckPath: /health
