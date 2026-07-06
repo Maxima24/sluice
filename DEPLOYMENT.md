@@ -41,7 +41,7 @@ The backend needs `FIBER_RPC_URL` + `FIBER_WS_URL` reachable **from Render** —
 
 ### Option B — Manual web service
 - Runtime **Node**, connect the repo, then:
-  - **Build:** `corepack enable && pnpm install --frozen-lockfile && pnpm --filter backend exec prisma generate && pnpm --filter backend build`
+  - **Build:** `corepack enable && pnpm install --frozen-lockfile && pnpm --filter backend build`  *(the backend `build` runs `prisma generate` first)*
   - **Start:** `pnpm --filter backend start:prod`
   - **Pre-Deploy:** `pnpm --filter backend exec prisma migrate deploy`
   - **Health Check Path:** `/health`

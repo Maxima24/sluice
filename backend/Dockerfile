@@ -13,9 +13,9 @@ COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
 RUN pnpm install --frozen-lockfile --filter backend...
 
-# Build
+# Build (the backend `build` script runs `prisma generate` first)
 COPY backend ./backend
-RUN pnpm --filter backend exec prisma generate && pnpm --filter backend build
+RUN pnpm --filter backend build
 
 ENV NODE_ENV=production
 EXPOSE 3000
