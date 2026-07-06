@@ -32,8 +32,14 @@ The backend needs `FIBER_RPC_URL` + `FIBER_WS_URL` reachable **from Render** —
 
 ## 1. Backend → Render
 
-### Option A — Blueprint (one click, uses `render.yaml`)
-1. Render Dashboard → **New → Blueprint** → select this repo → **Apply**. It provisions **Redis (Key Value)** and the **web service** (Postgres is external — Neon), runs `prisma migrate deploy` before traffic, and health-checks `/health`.
+### Recommended — Docker (simplest, most reliable)
+The root **`Dockerfile`** builds the backend from the monorepo and self-migrates on start, so none of the native-build quirks apply (corepack, devDeps, Node version — all handled inside the container).
+1. Render → **New → Web Service** → connect this repo → **Language / Runtime = `Docker`**. Render auto-detects the root `./Dockerfile` (context = repo root) — **no Build or Start command to set**.
+2. Set the env vars (list under Option B). Don't set `PORT` — Render injects it.
+3. Deploy. The container runs `prisma migrate deploy` then starts. Bump the instance to **Starter** (free spins down).
+
+### Option A — Blueprint (`render.yaml`, also Docker)
+1. Render Dashboard → **New → Blueprint** → select this repo → **Apply**. It provisions **Redis (Key Value)** and the Docker **web service** (Postgres is external — Neon), runs `prisma migrate deploy`, and health-checks `/health`.
 2. In the `fiber-backend` service → **Environment**, set the manual (`sync:false`) vars:
    - `DATABASE_URL` = your **Neon** URL (`postgresql://…neon.tech/…?sslmode=require`)
    - `CORS_ORIGINS` = your Vercel origin (e.g. `https://fiber-liquidity.vercel.app`), or `*` to start
@@ -51,7 +57,7 @@ The backend needs `FIBER_RPC_URL` + `FIBER_WS_URL` reachable **from Render** —
 - **Redis** (optional): add a **Render Key Value** (set **maxmemory-policy = noeviction**) or Upstash → `REDIS_URL`. Without it the app boots fine; only `POST /rebalance` is disabled.
 - Env: `NODE_ENV=production`, `DATABASE_URL` (Neon), `RUN_WORKER_INLINE=true`, `POLL_INTERVAL_MS=15000`, plus `CORS_ORIGINS` / `FIBER_RPC_URL` / `FIBER_WS_URL`.
 
-**Docker alternative:** `backend/Dockerfile` builds the backend image (build context = repo root: `docker build -f backend/Dockerfile -t fiber-backend .`).
+**Run the image locally:** `docker build -t fiber-backend . && docker run -p 3000:3000 --env-file backend/.env fiber-backend` (context = repo root; uses the root `Dockerfile`).
 
 ---
 
