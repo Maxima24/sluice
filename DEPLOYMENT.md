@@ -41,13 +41,15 @@ The backend needs `FIBER_RPC_URL` + `FIBER_WS_URL` reachable **from Render** —
 3. **Plans:** bump the web service to **Starter** — the **free** plan spins down on idle, which stops the poller, WS gateway, and rebalance worker.
 
 ### Option B — Manual web service
-- Runtime **Node**, connect the repo, then:
-  - **Build:** `corepack enable && pnpm install --frozen-lockfile && pnpm --filter backend build`  *(the backend `build` runs `prisma generate` first)*
-  - **Start:** `pnpm --filter backend start:prod`
-  - **Pre-Deploy:** `pnpm --filter backend exec prisma migrate deploy`
+- Runtime **Node**, **Root Directory empty** (build from repo root), connect the repo, then:
+  - **Build:** `npx --yes pnpm@9.15.9 install --frozen-lockfile && npx --yes pnpm@9.15.9 --filter backend run build`
+    *(use `npx`, not `corepack enable` — Render's `/usr/bin` is read-only. The backend `build` runs `prisma generate` first.)*
+  - **Start:** `cd backend && node dist/main.js`  *(no pnpm needed at runtime)*
+  - **Pre-Deploy:** `npx --yes pnpm@9.15.9 --filter backend exec prisma migrate deploy` (or run migrations locally against Neon)
   - **Health Check Path:** `/health`
-- Add a **Render Postgres** and a **Render Key Value** (Redis; set **maxmemory-policy = noeviction** for BullMQ). Wire `DATABASE_URL` + `REDIS_URL`.
-- Env: `NODE_ENV=production`, `RUN_WORKER_INLINE=true`, `POLL_INTERVAL_MS=15000`, plus `CORS_ORIGINS` / `FIBER_RPC_URL` / `FIBER_WS_URL`.
+- **Node version:** pinned to **22** via `.node-version` (else Render grabs the newest Node, which Prisma/Nest may not support). Or set `NODE_VERSION=22.11.0` in the dashboard.
+- **Redis** (optional): add a **Render Key Value** (set **maxmemory-policy = noeviction**) or Upstash → `REDIS_URL`. Without it the app boots fine; only `POST /rebalance` is disabled.
+- Env: `NODE_ENV=production`, `DATABASE_URL` (Neon), `RUN_WORKER_INLINE=true`, `POLL_INTERVAL_MS=15000`, plus `CORS_ORIGINS` / `FIBER_RPC_URL` / `FIBER_WS_URL`.
 
 **Docker alternative:** `backend/Dockerfile` builds the backend image (build context = repo root: `docker build -f backend/Dockerfile -t fiber-backend .`).
 
