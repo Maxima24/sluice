@@ -33,11 +33,12 @@ The backend needs `FIBER_RPC_URL` + `FIBER_WS_URL` reachable **from Render** —
 ## 1. Backend → Render
 
 ### Option A — Blueprint (one click, uses `render.yaml`)
-1. Render Dashboard → **New → Blueprint** → select this repo → **Apply**. It provisions **Postgres**, **Redis (Key Value)**, and the **web service**, runs `prisma migrate deploy` before traffic, and health-checks `/health`.
-2. In the `fiber-backend` service → **Environment**, set the three `sync:false` vars:
-   - `CORS_ORIGINS` = your Vercel origin (e.g. `https://fiber-liquidity.vercel.app`)
-   - `FIBER_RPC_URL` / `FIBER_WS_URL` = your node from §0
-3. **Plans:** bump the web service to **Starter** — the **free** plan spins down on idle, which stops the poller, WS gateway, and rebalance worker. Free Postgres also expires (~30 days).
+1. Render Dashboard → **New → Blueprint** → select this repo → **Apply**. It provisions **Redis (Key Value)** and the **web service** (Postgres is external — Neon), runs `prisma migrate deploy` before traffic, and health-checks `/health`.
+2. In the `fiber-backend` service → **Environment**, set the manual (`sync:false`) vars:
+   - `DATABASE_URL` = your **Neon** URL (`postgresql://…neon.tech/…?sslmode=require`)
+   - `CORS_ORIGINS` = your Vercel origin (e.g. `https://fiber-liquidity.vercel.app`), or `*` to start
+   - `FIBER_RPC_URL` / `FIBER_WS_URL` = your node from §0 (the cloudflared URL — tunnel running)
+3. **Plans:** bump the web service to **Starter** — the **free** plan spins down on idle, which stops the poller, WS gateway, and rebalance worker.
 
 ### Option B — Manual web service
 - Runtime **Node**, connect the repo, then:

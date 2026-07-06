@@ -1,14 +1,9 @@
-# Render Blueprint — Fiber Liquidity Layer backend (Postgres + Redis + web service).
+# Render Blueprint — Fiber Liquidity Layer backend (Redis + web service on Render;
+# Postgres is external — Neon, set DATABASE_URL manually).
 # Deploy: Render Dashboard → New → Blueprint → pick this repo. See DEPLOYMENT.md.
 #
 # The FNN node is NOT hosted here. Set FIBER_RPC_URL / FIBER_WS_URL to a node
 # reachable from Render (see DEPLOYMENT.md → "Where the Fiber node runs").
-
-databases:
-  - name: fiber-db
-    plan: free # NOTE: free Postgres expires after ~30 days — upgrade for anything real.
-    databaseName: fiber
-    user: fiber
 
 services:
   # Redis for BullMQ (rebalance worker). BullMQ requires the noeviction policy.
@@ -33,9 +28,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        fromDatabase:
-          name: fiber-db
-          property: connectionString
+        sync: false # your Neon Postgres URL: postgresql://…neon.tech/…?sslmode=require
       - key: REDIS_URL
         fromService:
           type: redis
