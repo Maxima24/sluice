@@ -42,8 +42,8 @@ The backend needs `FIBER_RPC_URL` + `FIBER_WS_URL` reachable **from Render** —
 
 ### Option B — Manual web service
 - Runtime **Node**, **Root Directory empty** (build from repo root), connect the repo, then:
-  - **Build:** `npx --yes pnpm@9.15.9 install --frozen-lockfile && npx --yes pnpm@9.15.9 --filter backend run build`
-    *(use `npx`, not `corepack enable` — Render's `/usr/bin` is read-only. The backend `build` runs `prisma generate` first.)*
+  - **Build:** `npx --yes pnpm@9.15.9 install --frozen-lockfile --prod=false && npx --yes pnpm@9.15.9 --filter backend run build`
+    *(use `npx`, not `corepack enable` — Render's `/usr/bin` is read-only. `--prod=false` forces devDeps — with `NODE_ENV=production` pnpm skips them, but nest CLI / prisma / tsc are devDeps. The backend `build` runs `prisma generate` first.)*
   - **Start:** `cd backend && node dist/main.js`  *(no pnpm needed at runtime)*
   - **Pre-Deploy:** `npx --yes pnpm@9.15.9 --filter backend exec prisma migrate deploy` (or run migrations locally against Neon)
   - **Health Check Path:** `/health`
