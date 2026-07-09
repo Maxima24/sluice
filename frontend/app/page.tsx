@@ -1,144 +1,78 @@
-import { serverFetch } from '@/lib/api/client';
-import { LiveStatus } from '@/components/live-status';
+'use client';
 
-interface NodeInfo {
-  version: string;
-  pubkey: string;
-  chainHash: string;
-  nodeName?: string | null;
-}
+import { WifiOff } from 'lucide-react';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { AlertBanner } from '@/components/ui/AlertBanner';
+import { MetricTile } from '@/components/ui/MetricTile';
+import { StatusDot } from '@/components/ui/StatusDot';
+import type { StatusTone } from '@/components/ui/types';
+import { ChannelList } from '@/components/dashboard/ChannelList';
+import { NodeIdentityPanel } from '@/components/dashboard/NodeIdentityPanel';
+import { useNodeInfo } from '@/lib/queries/node';
+import { useChannelHealth } from '@/lib/queries/channels';
+import { formatCkb, sumShannon } from '@/lib/format';
 
-interface ChannelHealthChannel {
-  channelId: string;
-  peerPubkey: string;
-  state: string;
-  outbound: string;
-  inbound: string;
-  capacity: string;
-  inboundRatio: number;
-}
+export default function OverviewPage() {
+  const node = useNodeInfo();
+  const health = useChannelHealth();
 
-interface ChannelHealth {
-  source: 'live' | 'snapshot';
-  stale: boolean;
-  channels: ChannelHealthChannel[];
-}
-
-// Always fetch fresh from the node (source of truth) on each request.
-export const dynamic = 'force-dynamic';
-
-const card: React.CSSProperties = {
-  marginTop: 20,
-  padding: 20,
-  background: 'var(--color-surface)',
-  border: '1px solid var(--color-border)',
-  borderRadius: 12,
-};
-const label: React.CSSProperties = {
-  fontSize: '0.72rem',
-  textTransform: 'uppercase',
-  letterSpacing: 1,
-  color: 'var(--color-muted)',
-};
-const mono: React.CSSProperties = { fontFamily: 'var(--font-mono)', wordBreak: 'break-all' };
-
-export default async function Home() {
-  const [info, health] = await Promise.all([
-    serverFetch<NodeInfo>('node/info'),
-    serverFetch<ChannelHealth>('channels/health'),
-  ]);
+  const channels = health.data?.channels ?? [];
+  const live = health.data?.source === 'live' && !health.data.stale;
+  const nodeDown = node.isError;
+  const statusTone: StatusTone = nodeDown ? 'danger' : live ? 'success' : 'warning';
+  const statusLabel = nodeDown ? 'Offline' : live ? 'Online' : 'Degraded';
+  const readyCount = channels.filter((c) => c.state === 'ChannelReady').length;
 
   return (
-    <main style={{ maxWidth: 880, margin: '0 auto', padding: '3rem 1.5rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <h1 style={{ fontSize: '1.6rem', fontWeight: 700 }}>Fiber Liquidity Layer</h1>
-        <LiveStatus />
+    <div>
+      <PageHeader title="Overview" description="Live liquidity health for this Fiber node." />
+      <div className="space-y-6 p-6">
+        {nodeDown ? (
+          <AlertBanner
+            tone="danger"
+            icon={<WifiOff className="h-4 w-4" />}
+            title="Node unreachable"
+            description="The backend or the FNN node is down — showing last-known data where available."
+          />
+        ) : health.data && (health.data.source === 'snapshot' || health.data.stale) ? (
+          <AlertBanner
+            tone="warning"
+            title="Showing last-known snapshot"
+            description="The live node is unreachable; channel balances may be stale."
+          />
+        ) : null}
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <MetricTile
+            label="Node status"
+            value={
+              <span className="flex items-center gap-2 text-2xl">
+                <StatusDot tone={statusTone} pulse={live} />
+                {statusLabel}
+              </span>
+            }
+            hint={node.data?.version ? `v${node.data.version}` : undefined}
+          />
+          <MetricTile label="Channels" value={channels.length} hint={`${readyCount} ready`} />
+          <MetricTile
+            label="Total outbound"
+            value={<span className="text-2xl">{formatCkb(sumShannon(channels.map((c) => c.outbound)))}</span>}
+            hint="can send"
+          />
+          <MetricTile
+            label="Total inbound"
+            value={<span className="text-2xl">{formatCkb(sumShannon(channels.map((c) => c.inbound)))}</span>}
+            hint="can receive"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <ChannelList data={health.data} isPending={health.isPending} />
+          </div>
+          <NodeIdentityPanel info={node.data} isPending={node.isPending} isError={node.isError} />
+        </div>
       </div>
-      <p style={{ color: 'var(--color-muted)', marginTop: 4 }}>
-        Node operability dashboard — base
-      </p>
-
-      <section style={card}>
-        <h2 style={label}>Node</h2>
-        {info ? (
-          <dl
-            style={{
-              marginTop: 12,
-              display: 'grid',
-              gridTemplateColumns: 'auto 1fr',
-              gap: '6px 16px',
-            }}
-          >
-            <dt style={{ color: 'var(--color-muted)' }}>Version</dt>
-            <dd>{info.version}</dd>
-            <dt style={{ color: 'var(--color-muted)' }}>Pubkey</dt>
-            <dd style={mono}>{info.pubkey}</dd>
-            <dt style={{ color: 'var(--color-muted)' }}>Chain</dt>
-            <dd style={mono}>{info.chainHash}</dd>
-          </dl>
-        ) : (
-          <p style={{ marginTop: 12, color: 'var(--color-danger)' }}>
-            Node unreachable — the backend or the FNN node is down.
-          </p>
-        )}
-      </section>
-
-      <section style={card}>
-        <h2 style={label}>
-          Channels{health ? ` · ${health.source}${health.stale ? ' (stale)' : ''}` : ''}
-        </h2>
-        {health && health.channels.length > 0 ? (
-          <ul style={{ marginTop: 12, listStyle: 'none', display: 'grid', gap: 12, padding: 0 }}>
-            {health.channels.map((c) => (
-              <li key={c.channelId}>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    fontSize: '0.8rem',
-                    color: 'var(--color-muted)',
-                  }}
-                >
-                  <span style={mono}>{c.peerPubkey.slice(0, 12)}…</span>
-                  <span>{c.state}</span>
-                </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    height: 10,
-                    borderRadius: 6,
-                    overflow: 'hidden',
-                    marginTop: 4,
-                    background: 'var(--color-border)',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: `${(1 - c.inboundRatio) * 100}%`,
-                      background: 'var(--color-outbound)',
-                    }}
-                    title={`outbound ${c.outbound}`}
-                  />
-                  <div
-                    style={{ width: `${c.inboundRatio * 100}%`, background: 'var(--color-inbound)' }}
-                    title={`inbound ${c.inbound}`}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p style={{ marginTop: 12, color: 'var(--color-muted)' }}>
-            {health
-              ? 'No channels yet. Fund the wallet + open a channel — see infra/README.md §3.'
-              : 'Channel data unavailable.'}
-          </p>
-        )}
-      </section>
-
-      <p style={{ marginTop: 24, fontSize: '0.75rem', color: 'var(--color-muted)' }}>
-        Blue = outbound (local) · green = inbound (remote). Live per-channel bars land in Step 3.
-      </p>
-    </main>
+    </div>
   );
 }

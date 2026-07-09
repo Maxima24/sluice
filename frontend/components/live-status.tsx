@@ -1,27 +1,20 @@
 'use client';
 
-import { useState } from 'react';
-import { useFiberSocket, type RealtimeMessage } from '@/hooks/useFiberSocket';
+import { useRealtimeSync } from '@/hooks/useRealtimeSync';
+import { StatusDot } from '@/components/ui/StatusDot';
 
-/** Minimal live indicator proving the backend->frontend push works (Step 4). */
+/** Node WebSocket liveness indicator (hosts the app's single realtime connection). */
 export function LiveStatus() {
-  const [last, setLast] = useState<string | null>(null);
-  const { connected } = useFiberSocket((msg: RealtimeMessage) => {
-    if (msg.event === 'balance-changed') setLast(new Date().toLocaleTimeString());
-  });
-
+  const { connected, lastEventAt } = useRealtimeSync();
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', color: 'var(--color-muted)' }}>
-      <span
-        style={{
-          width: 8,
-          height: 8,
-          borderRadius: '50%',
-          background: connected ? 'var(--color-inbound)' : 'var(--color-danger)',
-        }}
-      />
-      {connected ? 'live' : 'disconnected'}
-      {last ? ` · last update ${last}` : ''}
+    <div className="flex items-center gap-2 text-xs">
+      <StatusDot tone={connected ? 'success' : 'danger'} pulse={connected} />
+      <span className="text-neutral-600">{connected ? 'live' : 'offline'}</span>
+      {lastEventAt ? (
+        <span className="tabular-nums text-neutral-500" data-numeric>
+          · {lastEventAt.toLocaleTimeString()}
+        </span>
+      ) : null}
     </div>
   );
 }
