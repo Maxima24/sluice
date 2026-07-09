@@ -71,3 +71,43 @@ export interface ProbeResult {
   hops?: ProbeHop[];
   bottleneck?: ProbeHop | null;
 }
+
+export interface RebalanceRequest {
+  sourceChannelId: string;
+  destChannelId: string;
+  amount: string;
+  maxFee: string;
+  idempotencyKey: string;
+}
+
+/** status: PENDING | BUILDING | INFLIGHT | SUCCEEDED | FAILED */
+export interface RebalanceJob {
+  id: string;
+  idempotencyKey: string;
+  sourceChannelId: string;
+  destChannelId: string;
+  amount: string;
+  maxFee: string;
+  status: string;
+  paymentHash: string | null;
+  feePaid: string | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChannelReconciliation {
+  channelId: string;
+  inSync: boolean;
+  snapshotOutbound: string | null;
+  nodeOutbound: string | null;
+  drift: string; // decimal |snapshot - node|
+  driftAt?: string;
+}
+
+export interface ReconciliationStatus {
+  inSync: boolean;
+  tolerance: string;
+  channels: ChannelReconciliation[];
+  checkedAt: string;
+}
