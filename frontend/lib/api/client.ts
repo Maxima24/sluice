@@ -4,7 +4,7 @@ import type { Envelope } from '@/types/api';
 
 /** Browser JSON client. Backend CORS must allow this origin for client-side calls. */
 const apiClient = ky.create({
-  prefixUrl: env.NEXT_PUBLIC_API_URL,
+  prefix: env.NEXT_PUBLIC_API_URL,
   retry: { limit: 0 },
   timeout: 20_000,
 });

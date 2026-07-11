@@ -16,7 +16,10 @@ export interface RealtimeMessage {
 export function useFiberSocket(onEvent?: (msg: RealtimeMessage) => void) {
   const [connected, setConnected] = useState(false);
   const cbRef = useRef(onEvent);
-  cbRef.current = onEvent;
+
+  useEffect(() => {
+    cbRef.current = onEvent;
+  }, [onEvent]);
 
   useEffect(() => {
     const base = env.NEXT_PUBLIC_WS_URL;
