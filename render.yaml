@@ -1,0 +1,54 @@
+# Render Blueprint — Fiber Liquidity Layer backend (Redis + web service on Render;
+# Postgres is external — Neon, set DATABASE_URL manually).
+# Deploy: Render Dashboard → New → Blueprint → pick this repo. See DEPLOYMENT.md.
+#
+# The FNN node is NOT hosted here. Set FIBER_RPC_URL / FIBER_WS_URL to a node
+# reachable from Render (see DEPLOYMENT.md → "Where the Fiber node runs").
+
+services:
+  # Redis for BullMQ (rebalance worker). BullMQ requires the noeviction policy.
+  - type: redis
+    name: fiber-redis
+    plan: free
+    ipAllowList: [] # internal-only (reachable from the web service, not the internet)
+    maxmemoryPolicy: noeviction
+
+  - type: web
+    name: fiber-backend
+    runtime: docker # self-contained build via the root Dockerfile (avoids native-build quirks)
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free # NOTE: free web services SPIN DOWN on idle, which stops the poller,
+    #             the WS gateway, and the rebalance worker. Use "starter" for always-on.
+    region: oregon
+    branch: main
+    # The Dockerfile handles install/build/migrate/start — no build or start commands needed.
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false # your Neon Postgres URL: postgresql://…neon.tech/…?sslmode=require
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: fiber-redis
+          property: connectionString
+      - key: RUN_WORKER_INLINE
+        value: "true" # run the rebalance worker inside the web service (single instance)
+      - key: POLL_INTERVAL_MS
+        value: "15000"
+      - key: FIBER_RPC_TIMEOUT_MS
+        value: "10000"
+      # ── Set these in the dashboard after the frontend + node exist ──
+      - key: CORS_ORIGINS
+        sync: false # your Vercel origin, e.g. https://fiber-liquidity.vercel.app
+      - key: FIBER_RPC_URL
+        sync: false # a node reachable from Render, e.g. https://node.example.com
+      - key: FIBER_WS_URL
+        sync: false # e.g. wss://node.example.com
+      # Optional shared-secret gate. If you set this, the browser frontend needs a
+      # server-side proxy to inject X-Dashboard-Secret (see DEPLOYMENT.md). Leave
+      # unset for an open testnet demo.
+      # - key: DASHBOARD_SECRET
+      #   generateValue: true

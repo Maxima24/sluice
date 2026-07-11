@@ -1,23 +1,27 @@
-import ky, { HTTPError } from 'ky';
 import { env } from '@/lib/env';
 import type { Envelope } from '@/types/api';
 
-/** Browser JSON client. Backend CORS must allow this origin for client-side calls. */
-const apiClient = ky.create({
-  prefix: env.NEXT_PUBLIC_API_URL,
-  retry: { limit: 0 },
-  timeout: 20_000,
-});
+const base = env.NEXT_PUBLIC_API_URL.replace(/\/$/, '');
+const url = (path: string) => `${base}/${path.replace(/^\//, '')}`;
 
-/** Envelope-unwrapping helpers ({ statusCode, message, data } -> data). */
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url(path), {
+    ...init,
+    headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
+  });
+  const body = (await res.json().catch(() => null)) as (Envelope<T> & { message?: string }) | null;
+  if (!res.ok) throw new Error(body?.message ?? `HTTP ${res.status}`);
+  return (body as Envelope<T>).data;
+}
+
+/** Browser JSON client. Backend CORS must allow this origin for client-side calls. */
 export const api = {
-  get: <T>(path: string, options?: Parameters<typeof apiClient.get>[1]) =>
-    apiClient.get(path, options).json<Envelope<T>>().then((r) => r.data),
-  post: <T>(path: string, json?: unknown, options?: Parameters<typeof apiClient.post>[1]) =>
-    apiClient
-      .post(path, { json, ...options })
-      .json<Envelope<T>>()
-      .then((r) => r.data),
+  get: <T>(path: string) => request<T>(path),
+  post: <T>(path: string, json?: unknown) =>
+    request<T>(path, {
+      method: 'POST',
+      body: json !== undefined ? JSON.stringify(json) : undefined,
+    }),
 };
 
 /**
@@ -26,9 +30,7 @@ export const api = {
  */
 export async function serverFetch<T>(path: string): Promise<T | null> {
   try {
-    const res = await fetch(`${env.NEXT_PUBLIC_API_URL}/${path.replace(/^\//, '')}`, {
-      cache: 'no-store',
-    });
+    const res = await fetch(url(path), { cache: 'no-store' });
     if (!res.ok) return null;
     const body = (await res.json()) as Envelope<T>;
     return body.data;
@@ -36,5 +38,3 @@ export async function serverFetch<T>(path: string): Promise<T | null> {
     return null;
   }
 }
-
-export { HTTPError };
