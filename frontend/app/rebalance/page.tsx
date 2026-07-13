@@ -5,6 +5,7 @@ import { ArrowRight, RefreshCw, Scale } from 'lucide-react';
 import { CanvasAppShell, CanvasWorkspace, WorkspaceHeader, WorkspacePanel } from '@/components/canvas-dashboard/CanvasAppShell';
 import { useChannelHealth } from '@/lib/queries/channels';
 import { useCreateRebalance, useRebalanceJob } from '@/lib/queries/rebalance';
+import { dashboardAuth } from '@/lib/api/client';
 import { rebalanceSchema } from '@/lib/rebalance-schema';
 import { focusWorkspaceModule } from '@/lib/workspace';
 import { formatCkb, truncateId } from '@/lib/format';
@@ -22,8 +23,16 @@ export default function RebalancePage() {
   const [amount, setAmount] = useState('');
   const [maxFee, setMaxFee] = useState('');
   const [idempotencyKey, setKey] = useState('');
+  const [secret, setSecret] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [jobId, setJobId] = useState<string | null>(null);
+
+  // Hydrate the operator secret from localStorage on the client only (deferred
+  // so the first client render still matches the SSR markup).
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSecret(dashboardAuth.get()), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const create = useCreateRebalance();
   const job = useRebalanceJob(jobId);
@@ -107,6 +116,18 @@ export default function RebalancePage() {
 
             <ConsoleField label="Idempotency key">
               <ConsoleInput value={idempotencyKey} onChange={setKey} placeholder="request key" />
+            </ConsoleField>
+
+            <ConsoleField label="Operator secret" hint="only if the API is locked — stays in this browser">
+              <ConsoleInput
+                value={secret}
+                onChange={(value) => {
+                  setSecret(value);
+                  dashboardAuth.set(value);
+                }}
+                placeholder="X-Dashboard-Secret"
+                type="password"
+              />
             </ConsoleField>
 
             <button
@@ -223,12 +244,14 @@ function ConsoleInput({
   placeholder,
   inputMode,
   list,
+  type,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
   inputMode?: 'numeric';
   list?: string;
+  type?: 'text' | 'password';
 }) {
   return (
     <input
@@ -237,6 +260,7 @@ function ConsoleInput({
       placeholder={placeholder}
       inputMode={inputMode}
       list={list}
+      type={type ?? 'text'}
       className="h-11 w-full rounded-[4px] border border-line bg-panel px-3 font-mono text-sm text-ink-editorial outline-none transition placeholder:text-faint focus:border-ink-editorial"
     />
   );
