@@ -31,8 +31,23 @@ import {
   type ReactNode,
   type WheelEvent,
 } from 'react';
+import Link from 'next/link';
 import { focusWorkspaceModule, type WorkspaceModuleId } from '@/lib/workspace';
 import { cn } from '@/lib/utils';
+import { useChannelHealth } from '@/lib/queries/channels';
+import { useNodePeers } from '@/lib/queries/node';
+import { useReconciliation } from '@/lib/queries/reconciliation';
+import { useRealtimeSync } from '@/hooks/useRealtimeSync';
+import { formatCkb, sumShannon, truncateId } from '@/lib/format';
+import {
+  channelState,
+  deriveAlerts,
+  healthScore,
+  liquidityLabel,
+  outboundPct,
+  pickRebalancePair,
+  totalOutbound,
+} from '@/lib/liquidity';
 
 interface WorkspaceModule {
   id: WorkspaceModuleId;
@@ -172,6 +187,11 @@ export function InfiniteCanvas() {
   const [drag, setDrag] = useState<DragState | null>(null);
   const [spaceDown, setSpaceDown] = useState(false);
   const [focused, setFocused] = useState<WorkspaceModuleId | null>(null);
+
+  // Single WS for the whole app (the canvas is mounted on every route). On
+  // `balance-changed` this patches the channel-health cache in place, so every
+  // data-driven module below updates live.
+  const { connected } = useRealtimeSync();
 
   useEffect(() => {
     zoomRef.current = zoom;
@@ -416,8 +436,8 @@ export function InfiniteCanvas() {
     >
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[length:96px_96px]" />
       <div className="pointer-events-none absolute left-5 top-4 z-20 flex items-center gap-3 rounded-[4px] border border-white/12 bg-machine px-3 py-2 text-white">
-        <span className="h-2 w-2 animate-pulse rounded-full border border-white/70 bg-transparent" />
-        <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-white/50">Workspace live</span>
+        <span className={cn('h-2 w-2 rounded-full border', connected ? 'animate-pulse border-white/70 bg-white' : 'border-white/40 bg-transparent')} />
+        <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-white/50">{connected ? 'Workspace live' : 'Workspace offline'}</span>
         {focused ? <span className="font-mono text-[10px] text-white/32">focus: {moduleMap.get(focused)?.title}</span> : null}
       </div>
 
@@ -576,6 +596,12 @@ function ConnectionLayer({ modules, focused }: { modules: Map<WorkspaceModuleId,
 }
 
 function NetworkGraph() {
+  const peers = useNodePeers();
+  const health = useChannelHealth();
+  const label =
+    peers.isError || health.isError
+      ? 'node unreachable'
+      : `${peers.data?.length ?? '…'} peers / ${health.data?.channels.length ?? '…'} monitored channels`;
   const points = [
     [58, 154],
     [138, 86],
@@ -605,43 +631,47 @@ function NetworkGraph() {
       </svg>
       <div className="absolute bottom-3 left-3 rounded-[4px] border border-white/12 bg-machine px-3 py-2">
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/36">liquidity moving</p>
-        <p className="mt-1 text-sm font-semibold">7 peers / 4 monitored channels</p>
+        <p className="mt-1 text-sm font-semibold">{label}</p>
       </div>
     </div>
   );
 }
 
 function LiquidityMap() {
-  const rows = [
-    ['chan-01', 78, 'balanced'],
-    ['chan-02', 36, 'thin outbound'],
-    ['chan-03', 18, 'critical'],
-    ['chan-04', 64, 'recovering'],
-  ] as const;
+  const health = useChannelHealth();
+  const channels = health.data?.channels ?? [];
 
   return (
     <div className="grid h-full grid-cols-[1fr_120px] gap-4">
-      <div className="space-y-3">
-        {rows.map(([label, value, state]) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => focusWorkspaceModule('channels')}
-            className="block w-full rounded-[4px] border border-white/12 bg-machine-panel-high p-3 text-left transition hover:border-white/28"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <span className="font-mono text-xs text-white/72">{label}</span>
-              <span className="text-[11px] text-white/38">{state}</span>
-            </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
-              <span className="block h-full rounded-full bg-white/80 transition-[width] duration-700" style={{ width: `${value}%` }} />
-            </div>
-          </button>
-        ))}
+      <div className="space-y-3 overflow-y-auto">
+        {health.isError ? (
+          <Notice text="Node unreachable." />
+        ) : health.isPending ? (
+          <Notice text="Loading channels…" />
+        ) : channels.length === 0 ? (
+          <Notice text="No channels open." />
+        ) : (
+          channels.map((c) => (
+            <button
+              key={c.channelId}
+              type="button"
+              onClick={() => focusWorkspaceModule('channels')}
+              className="block w-full rounded-[4px] border border-white/12 bg-machine-panel-high p-3 text-left transition hover:border-white/28"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-mono text-xs text-white/72">{truncateId(c.channelId, 6, 4)}</span>
+                <span className="text-[11px] text-white/38">{liquidityLabel(c)}</span>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+                <span className="block h-full rounded-full bg-white/80 transition-[width] duration-700" style={{ width: `${outboundPct(c)}%` }} />
+              </div>
+            </button>
+          ))
+        )}
       </div>
       <div className="rounded-[4px] border border-white/12 bg-machine-panel-high p-3">
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/34">Health</p>
-        <p className="mt-4 text-4xl font-black">78</p>
+        <p className="mt-4 text-4xl font-black">{channels.length ? healthScore(channels) : '—'}</p>
         <p className="mt-2 text-xs leading-5 text-white/42">Outbound capacity remains visible before payment attempts.</p>
       </div>
     </div>
@@ -649,73 +679,96 @@ function LiquidityMap() {
 }
 
 function RouteSimulation() {
+  const health = useChannelHealth();
+  const peers = useNodePeers();
+  const channels = health.data?.channels ?? [];
+  const sendableRaw = totalOutbound(channels);
+  const ready = channels.length > 0 && BigInt(sendableRaw) > BigInt(0);
+
   return (
     <div className="flex h-full flex-col">
       <div className="rounded-[4px] border border-white/12 bg-machine-panel-high p-4">
         <div className="flex items-center justify-between">
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/34">pre-flight result</p>
-          <span className="rounded-full border border-white/12 px-2 py-1 text-[10px] text-white/52">confidence 82%</span>
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/34">pre-flight readiness</p>
+          <Link
+            href="/probe"
+            className="rounded-full border border-white/12 px-2 py-1 text-[10px] text-white/72 transition hover:border-white/40"
+          >
+            simulate →
+          </Link>
         </div>
-        <div className="mt-5 flex items-center gap-2">
-          {['A', 'B', 'C', 'D', 'E'].map((hop, index) => (
-            <div key={hop} className="flex items-center gap-2">
-              <span className={cn('flex h-10 w-10 items-center justify-center rounded-full border font-mono text-xs', index === 2 ? 'border-white bg-white text-black' : 'border-white/16 bg-black text-white/72')}>
-                {hop}
-              </span>
-              {index < 4 ? <span className={cn('h-px w-10 border-t border-dashed', index === 1 ? 'border-white/70' : 'border-white/18')} /> : null}
-            </div>
-          ))}
-        </div>
+        <p className="mt-4 text-xs leading-5 text-white/50">
+          Resolve capacity, fees, and route before funds move. Open the probe to test a specific target and amount.
+        </p>
       </div>
       <div className="mt-4 grid flex-1 grid-cols-2 gap-3">
-        <MiniMetric label="fee ceiling" value="0.003 CKB" />
-        <MiniMetric label="bottleneck" value="hop C" />
-        <MiniMetric label="alt routes" value="3" />
-        <MiniMetric label="status" value="payable" />
+        <MiniMetric label="sendable" value={channels.length ? formatCkb(sendableRaw) : '—'} />
+        <MiniMetric label="peers" value={peers.data ? String(peers.data.length) : '—'} />
+        <MiniMetric label="channels" value={String(channels.length)} />
+        <MiniMetric label="status" value={health.isError ? 'offline' : ready ? 'ready' : 'blocked'} />
       </div>
     </div>
   );
 }
 
 function RebalanceEngine() {
+  const health = useChannelHealth();
+  const pair = pickRebalancePair(health.data?.channels ?? []);
+
   return (
     <div className="relative h-full overflow-hidden rounded-[4px] border border-white/12 bg-machine p-4">
-      <div className="grid h-full grid-cols-2 gap-4">
-        <Pool label="source" amount="8.42 CKB" fill="82%" />
-        <Pool label="destination" amount="2.19 CKB" fill="31%" />
-      </div>
-      <motion.div
-        className="absolute left-[26%] top-1/2 h-1 w-24 rounded-full bg-white"
-        animate={{ x: [0, 132, 0], opacity: [0.1, 0.9, 0.1] }}
-        transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
-      />
-      <button
-        type="button"
-        onClick={() => focusWorkspaceModule('rebalance')}
-        className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-[4px] border border-white bg-white px-4 py-2 text-xs font-bold text-black"
-      >
-        Inspect flow
-        <ArrowRight className="h-3.5 w-3.5" />
-      </button>
+      {pair ? (
+        <>
+          <div className="grid h-full grid-cols-2 gap-4">
+            <Pool label="source" amount={formatCkb(pair.source.outbound)} fill={`${outboundPct(pair.source)}%`} />
+            <Pool label="destination" amount={formatCkb(pair.dest.outbound)} fill={`${outboundPct(pair.dest)}%`} />
+          </div>
+          <motion.div
+            className="absolute left-[26%] top-1/2 h-1 w-24 rounded-full bg-white"
+            animate={{ x: [0, 132, 0], opacity: [0.1, 0.9, 0.1] }}
+            transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          <Link
+            href="/rebalance"
+            className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-[4px] border border-white bg-white px-4 py-2 text-xs font-bold text-black"
+          >
+            Inspect flow
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </>
+      ) : (
+        <div className="flex h-full items-center justify-center">
+          <Notice text={health.isError ? 'Node unreachable.' : 'Need ≥1 channel to rebalance.'} />
+        </div>
+      )}
     </div>
   );
 }
 
 function ChannelInspector() {
+  const health = useChannelHealth();
+  const channels = health.data?.channels ?? [];
+
+  if (health.isError) return <Notice text="Node unreachable." />;
+  if (health.isPending) return <Notice text="Loading channels…" />;
+  if (channels.length === 0) return <Notice text="No channels open." />;
+
   return (
-    <div className="h-full space-y-3 overflow-hidden">
-      {[
-        ['channel 1', 'healthy', '72%'],
-        ['channel 2', 'warning', '44%'],
-        ['channel 3', 'critical', '18%'],
-        ['channel 4', 'selected', '64%'],
-      ].map(([name, state, value]) => (
-        <button key={name} type="button" onClick={() => focusWorkspaceModule('liquidity')} className="flex w-full items-center justify-between rounded-[4px] border border-white/12 bg-machine-panel-high px-3 py-3 text-left transition hover:border-white/28">
-          <div>
-            <p className="font-mono text-xs text-white/72">{name}</p>
-            <p className="mt-1 text-[11px] text-white/34">{state}</p>
+    <div className="h-full space-y-3 overflow-y-auto">
+      {channels.map((c, i) => (
+        <button
+          key={c.channelId}
+          type="button"
+          onClick={() => focusWorkspaceModule('liquidity')}
+          className="flex w-full items-center justify-between rounded-[4px] border border-white/12 bg-machine-panel-high px-3 py-3 text-left transition hover:border-white/28"
+        >
+          <div className="min-w-0">
+            <p className="truncate font-mono text-xs text-white/72">
+              Channel {i + 1} · {truncateId(c.channelId, 6, 4)}
+            </p>
+            <p className="mt-1 text-[11px] text-white/34">{channelState(c)}</p>
           </div>
-          <span className="font-mono text-xs text-white">{value}</span>
+          <span className="font-mono text-xs text-white">{outboundPct(c)}%</span>
         </button>
       ))}
     </div>
@@ -723,29 +776,53 @@ function ChannelInspector() {
 }
 
 function AlertTimeline() {
-  const alerts = ['Outbound below 20%', 'Probe failed at hop C', 'Rebalance queued', 'Snapshot drift surfaced'];
+  const health = useChannelHealth();
+  const recon = useReconciliation();
+  const alerts = deriveAlerts(health.data, recon.data);
+
   return (
-    <div className="h-full rounded-[4px] border border-white/12 bg-machine-panel-high p-4">
-      {alerts.map((alert, index) => (
-        <div key={alert} className="relative border-l border-white/12 pb-5 pl-5 last:pb-0">
-          <span className="absolute -left-[5px] top-0 h-2.5 w-2.5 rounded-full bg-white" />
-          <p className="text-sm font-semibold">{alert}</p>
-          <p className="mt-1 font-mono text-[10px] text-white/34">{index + 2}m ago</p>
-        </div>
-      ))}
+    <div className="h-full overflow-y-auto rounded-[4px] border border-white/12 bg-machine-panel-high p-4">
+      {health.isError ? (
+        <Notice text="Node unreachable." />
+      ) : health.isPending ? (
+        <Notice text="Loading…" />
+      ) : alerts.length === 0 ? (
+        <Notice text="All channels healthy." />
+      ) : (
+        alerts.map((alert) => (
+          <div key={alert.id} className="relative border-l border-white/12 pb-5 pl-5 last:pb-0">
+            <span
+              className={cn(
+                'absolute -left-[5px] top-0 h-2.5 w-2.5 rounded-full',
+                alert.tone === 'danger' ? 'bg-white' : 'bg-white/50',
+              )}
+            />
+            <p className="text-sm font-semibold">{alert.text}</p>
+            <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.16em] text-white/34">{alert.tone}</p>
+          </div>
+        ))
+      )}
     </div>
   );
 }
 
 function ReconciliationModule() {
+  const recon = useReconciliation();
+  const data = recon.data;
+  const drift = data ? formatCkb(sumShannon(data.channels.map((c) => c.drift))) : '—';
+
   return (
     <div className="grid h-full grid-cols-2 gap-3">
-      <MiniMetric label="snapshot" value="synced" />
-      <MiniMetric label="drift" value="0.02 CKB" />
+      <MiniMetric label="snapshot" value={recon.isError ? 'offline' : data ? (data.inSync ? 'synced' : 'drift') : '—'} />
+      <MiniMetric label="drift" value={drift} />
       <MiniMetric label="ledger" value="double-entry" />
       <MiniMetric label="authority" value="fiber node" />
     </div>
   );
+}
+
+function Notice({ text }: { text: string }) {
+  return <p className="px-1 py-2 font-mono text-[11px] text-white/40">{text}</p>;
 }
 
 function MiniMetric({ label, value }: { label: string; value: string }) {

@@ -175,30 +175,28 @@ export default function RebalancePage() {
             </span>
           </div>
           <div className="space-y-2">
-            {(channels.length
-              ? channels.slice(0, 6)
-              : Array.from({ length: 4 }, (_, index) => ({
-                  channelId: `placeholder-${index}`,
-                  outbound: '0',
-                  inboundRatio: 0.35 + index * 0.12,
-                  isUdt: false,
-                }))
-            ).map((channel) => (
-              <button
-                key={channel.channelId}
-                type="button"
-                onClick={() => focusWorkspaceModule('channels')}
-                className="block w-full rounded-[4px] border border-line bg-panel p-3 text-left transition hover:border-ink-editorial"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <span className="truncate font-mono text-xs font-bold text-ink-editorial">{truncateId(channel.channelId)}</span>
-                  <span className="text-xs text-copy">{formatCkb(channel.outbound, { withUnit: !channel.isUdt })}</span>
-                </div>
-                <div className="mt-3 h-2 overflow-hidden rounded-none bg-shell-muted">
-                  <span className="block h-full rounded-none bg-ink-editorial" style={{ width: `${Math.round((1 - channel.inboundRatio) * 100)}%` }} />
-                </div>
-              </button>
-            ))}
+            {channels.length === 0 ? (
+              <p className="rounded-[4px] border border-dashed border-line bg-shell-muted p-4 text-sm leading-6 text-copy">
+                No channels open yet — fund and open a channel to see candidates here.
+              </p>
+            ) : (
+              channels.slice(0, 6).map((channel) => (
+                <button
+                  key={channel.channelId}
+                  type="button"
+                  onClick={() => focusWorkspaceModule('channels')}
+                  className="block w-full rounded-[4px] border border-line bg-panel p-3 text-left transition hover:border-ink-editorial"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate font-mono text-xs font-bold text-ink-editorial">{truncateId(channel.channelId)}</span>
+                    <span className="text-xs text-copy">{formatCkb(channel.outbound, { withUnit: !channel.isUdt })}</span>
+                  </div>
+                  <div className="mt-3 h-2 overflow-hidden rounded-none bg-shell-muted">
+                    <span className="block h-full rounded-none bg-ink-editorial" style={{ width: `${Math.round((1 - channel.inboundRatio) * 100)}%` }} />
+                  </div>
+                </button>
+              ))
+            )}
           </div>
         </WorkspacePanel>
       </CanvasWorkspace>
