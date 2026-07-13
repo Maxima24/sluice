@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      # postinstall runs `prisma generate` (no DB connection needed).
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Backend — typecheck
+        run: pnpm --filter backend typecheck
+
+      - name: Backend — test
+        run: pnpm --filter backend test
+
+      - name: Backend — build
+        run: pnpm --filter backend build
+
+      - name: Frontend — lint
+        run: pnpm --filter frontend lint
+
+      - name: Frontend — test
+        run: pnpm --filter frontend test
+
+      - name: Frontend — build
+        run: pnpm --filter frontend build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3000
+          NEXT_PUBLIC_WS_URL: ws://localhost:3000
