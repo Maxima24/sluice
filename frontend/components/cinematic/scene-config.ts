@@ -1,63 +1,58 @@
-import { FiActivity, FiAlertTriangle, FiCpu, FiGitBranch, FiLayers, FiRefreshCw, FiShield, FiZap } from 'react-icons/fi';
+import { FiActivity, FiAlertTriangle, FiCpu, FiGitBranch, FiGrid, FiRefreshCw } from 'react-icons/fi';
 
-export const SCENE_COUNT = 8;
+export const BOOT_STEPS = [
+  'INITIALIZING FIBER NODE',
+  'DISCOVERING CHANNELS',
+  'BUILDING ROUTE GRAPH',
+  'CALCULATING LIQUIDITY',
+  'SYNCHRONIZING NETWORK STATE',
+  'SYSTEM READY',
+] as const;
+
+export const SCENE_COUNT = 6;
 
 export const STORY_BEATS = [
   {
-    id: 'hero',
-    eyebrow: 'Fiber Liquidity Layer',
+    id: 'network',
+    eyebrow: 'Fiber Network',
     title: 'Fiber Liquidity Layer',
     subtitle: 'Making Liquidity Visible. Making Payments Predictable.',
-    icon: FiLayers,
-  },
-  {
-    id: 'network',
-    eyebrow: 'Network exploration',
-    title: 'A living map of channel capacity.',
-    subtitle: 'Inbound, outbound, capacity, and health emerge as the camera moves through the Fiber graph.',
     icon: FiGitBranch,
   },
   {
+    id: 'liquidity',
+    eyebrow: 'Liquidity Visualization',
+    title: 'Capacity becomes visible.',
+    subtitle: 'Inbound. Outbound. Health. Capacity.',
+    icon: FiActivity,
+  },
+  {
     id: 'problem',
-    eyebrow: 'Liquidity problem',
-    title: 'A healthy node can still fail payments.',
-    subtitle: 'One channel drains asymmetrically until outbound capacity becomes a routing risk.',
+    eyebrow: 'Problem Demonstration',
+    title: 'One depleted channel breaks the route.',
+    subtitle: 'Healthy becomes warning. Warning becomes critical.',
     icon: FiAlertTriangle,
   },
   {
-    id: 'route',
-    eyebrow: 'Payment route',
-    title: 'The payment finds the bottleneck.',
-    subtitle: 'A route that looked possible pauses at insufficient outbound liquidity.',
-    icon: FiZap,
-  },
-  {
-    id: 'probe',
-    eyebrow: 'Can I Pay?',
-    title: 'Probe before funds move.',
-    subtitle: 'Route confidence, estimated fee, probability, and available capacity become explicit.',
-    icon: FiActivity,
+    id: 'intelligence',
+    eyebrow: 'Route Intelligence',
+    title: 'Can I Pay?',
+    subtitle: 'Alternative paths, confidence, fees, and capacity resolve before funds move.',
+    icon: FiCpu,
   },
   {
     id: 'rebalance',
     eyebrow: 'Rebalancing',
-    title: 'Liquidity moves back into shape.',
-    subtitle: 'Overfunded channels refill depleted paths and health indicators recover.',
+    title: 'Liquidity returns to equilibrium.',
+    subtitle: 'Warnings disappear. Capacity stabilizes.',
     icon: FiRefreshCw,
   },
   {
-    id: 'dashboard',
-    eyebrow: 'Dashboard reveal',
-    title: 'The cinematic graph becomes an operator console.',
-    subtitle: 'Panels, charts, bars, probes, and audit records assemble from the network itself.',
-    icon: FiCpu,
-  },
-  {
-    id: 'architecture',
-    eyebrow: 'Architecture',
-    title: 'Built for Operators. Powered by Fiber.',
-    subtitle: 'A reusable liquidity layer for monitoring, probing, rebalancing, and production readiness.',
-    icon: FiShield,
+    id: 'assembly',
+    eyebrow: 'Application Assembly',
+    title: 'The system is ready.',
+    subtitle: 'The visualization becomes the operator dashboard.',
+    icon: FiGrid,
   },
 ] as const;
 

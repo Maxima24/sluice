@@ -17,8 +17,8 @@ export function NodeIdentityPanel({
     ? [
         ['Version', info.version],
         ['Node', info.nodeName || '—'],
-        ['Pubkey', <span className="font-mono">{truncateId(info.pubkey, 10, 8)}</span>],
-        ['Chain', <span className="font-mono">{truncateId(info.chainHash, 10, 8)}</span>],
+        ['Pubkey', <span key="pubkey" className="font-mono">{truncateId(info.pubkey, 10, 8)}</span>],
+        ['Chain', <span key="chain" className="font-mono">{truncateId(info.chainHash, 10, 8)}</span>],
         ['Addresses', String(info.addresses?.length ?? 0)],
       ]
     : [];

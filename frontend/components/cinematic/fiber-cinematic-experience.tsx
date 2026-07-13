@@ -1,24 +1,46 @@
 'use client';
 
+import { AnimatePresence } from 'framer-motion';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useChannelHealth } from '@/lib/queries/channels';
+import { useNodeInfo } from '@/lib/queries/node';
+import { useReconciliation } from '@/lib/queries/reconciliation';
+import { BootSequence } from './boot-sequence';
+import { DashboardAssembler } from './dashboard-assembler';
 import { NetworkCanvas } from './network-canvas';
 import { SCENE_COUNT } from './scene-config';
 import { StoryOverlay } from './story-overlay';
-import type { CinematicData } from './types';
 
 gsap.registerPlugin(ScrollTrigger);
 
-export function FiberCinematicExperience({ info, health, reconciliation }: CinematicData) {
+export function FiberCinematicExperience() {
   const wrapperRef = useRef<HTMLElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const node = useNodeInfo();
+  const health = useChannelHealth();
+  const reconciliation = useReconciliation();
+  const [bootComplete, setBootComplete] = useState(false);
   const [progress, setProgress] = useState(0);
   const [quality, setQuality] = useState<'full' | 'reduced'>(() => {
     if (typeof window === 'undefined') return 'full';
     return getSceneQuality();
   });
+
+  const completeBoot = useCallback(() => setBootComplete(true), []);
+
+  useEffect(() => {
+    if (bootComplete) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [bootComplete]);
 
   useEffect(() => {
     const updateQuality = () => setQuality(getSceneQuality());
@@ -27,6 +49,8 @@ export function FiberCinematicExperience({ info, health, reconciliation }: Cinem
   }, []);
 
   useEffect(() => {
+    if (!bootComplete) return;
+
     const wrapper = wrapperRef.current;
     const stage = stageRef.current;
     if (!wrapper || !stage) return;
@@ -34,8 +58,8 @@ export function FiberCinematicExperience({ info, health, reconciliation }: Cinem
     const lenis = new Lenis({
       duration: 1.18,
       smoothWheel: true,
-      wheelMultiplier: 0.84,
-      touchMultiplier: 1.15,
+      wheelMultiplier: 0.82,
+      touchMultiplier: 1.1,
     });
 
     lenis.on('scroll', ScrollTrigger.update);
@@ -60,35 +84,48 @@ export function FiberCinematicExperience({ info, health, reconciliation }: Cinem
       },
     });
 
-    ScrollTrigger.refresh();
+    const refreshFrame = window.requestAnimationFrame(() => ScrollTrigger.refresh());
 
     return () => {
+      window.cancelAnimationFrame(refreshFrame);
       trigger.kill();
       gsap.ticker.remove(tick);
       lenis.destroy();
     };
-  }, []);
+  }, [bootComplete]);
 
-  const activeScene = useMemo(
-    () => Math.min(SCENE_COUNT - 1, Math.floor(progress * SCENE_COUNT)),
-    [progress],
-  );
+  const activeScene = useMemo(() => Math.min(SCENE_COUNT - 1, Math.floor(progress * SCENE_COUNT)), [progress]);
 
   return (
-    <main ref={wrapperRef} className="relative min-h-screen bg-[#02050b] text-white">
-      <div ref={stageRef} className="relative h-screen overflow-hidden bg-[#02050b]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_36%,rgba(40,110,255,0.28),transparent_34%),radial-gradient(circle_at_76%_62%,rgba(103,232,249,0.12),transparent_28%),linear-gradient(180deg,#02050b_0%,#07101c_52%,#02050b_100%)]" />
-        <div className="absolute inset-0 opacity-[0.12] mix-blend-screen [background-image:linear-gradient(rgba(255,255,255,0.16)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.16)_1px,transparent_1px)] [background-size:64px_64px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(2,5,11,0.28)_54%,rgba(2,5,11,0.92)_100%)]" />
-        <NetworkCanvas progress={progress} quality={quality} />
-        <StoryOverlay
-          progress={progress}
-          activeScene={activeScene}
-          info={info}
-          health={health}
-          reconciliation={reconciliation}
-        />
-      </div>
+    <main className="relative bg-black text-white">
+      <AnimatePresence>{bootComplete ? null : <BootSequence onComplete={completeBoot} />}</AnimatePresence>
+
+      <section ref={wrapperRef} className="relative bg-black">
+        <div ref={stageRef} className="relative h-screen overflow-hidden bg-black">
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,#000000_0%,#050505_50%,#000000_100%)]" />
+          <div className="absolute inset-0 opacity-[0.12] [background-image:linear-gradient(rgba(255,255,255,0.22)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.22)_1px,transparent_1px)] [background-size:64px_64px]" />
+          <div className="absolute inset-y-0 left-0 w-32 bg-[linear-gradient(90deg,#000000,transparent)] md:w-52" />
+          <div className="absolute inset-y-0 right-0 w-32 bg-[linear-gradient(270deg,#000000,transparent)] md:w-52" />
+          <div className="absolute inset-x-0 bottom-0 h-40 bg-[linear-gradient(0deg,#000000,transparent)]" />
+          <NetworkCanvas progress={progress} quality={quality} />
+          <StoryOverlay
+            progress={progress}
+            activeScene={activeScene}
+            info={node.data ?? null}
+            health={health.data ?? null}
+            reconciliation={reconciliation.data ?? null}
+          />
+        </div>
+      </section>
+
+      <DashboardAssembler
+        info={node.data ?? null}
+        health={health.data ?? null}
+        reconciliation={reconciliation.data ?? null}
+        nodePending={node.isPending}
+        nodeError={node.isError}
+        healthPending={health.isPending}
+      />
     </main>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { Waypoints } from 'lucide-react';
 import { PageShell } from './PageShell';
 import { Sidebar } from './Sidebar';
@@ -23,6 +24,16 @@ function Brand() {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+
+  if (
+    ['/', '/network', '/channels', '/liquidity', '/probe', '/rebalance', '/alerts', '/reconciliation'].some(
+      (route) => pathname === route || pathname.startsWith(`${route}/`),
+    )
+  ) {
+    return <>{children}</>;
+  }
+
   return (
     <PageShell
       sidebar={<Sidebar brand={<Brand />} sections={fiberNav} />}

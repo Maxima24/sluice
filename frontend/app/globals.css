@@ -1,78 +1,78 @@
 @import "tailwindcss";
 
-/* Forge design tokens, ported to Tailwind v4 (@theme) — dark-first.
-   Each --color-x auto-generates bg, text, border and ring utilities;
-   opacity modifiers work on hex via color-mix. A light theme can be
-   added later under a :root:not(.dark) block. */
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  /* Cool-slate neutrals — 50 darkest (surfaces) … 900 lightest (ink). */
-  --color-neutral-50:  #0a0e14;
-  --color-neutral-100: #11161f;
-  --color-neutral-200: #1a212c;
-  --color-neutral-300: #232c39;
-  --color-neutral-400: #64748b;
-  --color-neutral-500: #94a3b8;
-  --color-neutral-600: #cbd5e1;
-  --color-neutral-700: #d4dbe4;
-  --color-neutral-800: #e6ebf1;
-  --color-neutral-900: #f2f5f9;
+  --color-neutral-50: #050505;
+  --color-neutral-100: #0b0b0b;
+  --color-neutral-200: #141414;
+  --color-neutral-300: #242424;
+  --color-neutral-400: #525252;
+  --color-neutral-500: #8a8a8a;
+  --color-neutral-600: #bdbdbd;
+  --color-neutral-700: #d6d6d6;
+  --color-neutral-800: #ededed;
+  --color-neutral-900: #fafafa;
 
-  /* Semantic surface / text aliases (theme-aware chrome). */
-  --color-surface:                #0a0e14;
-  --color-surface-container:      #11161f;
-  --color-surface-container-high: #1a212c;
-  --color-outline:                #222b38;
-  --color-outline-variant:        #2c3644;
-  --color-ink:                    #f2f5f9;
-  --color-ink-muted:              #94a3b8;
+  --color-surface: #000000;
+  --color-surface-container: #0b0b0b;
+  --color-surface-container-high: #161616;
+  --color-outline: #242424;
+  --color-outline-variant: #363636;
+  --color-ink: #fafafa;
+  --color-ink-muted: #9b9b9b;
 
-  /* Accent (teal — brand). 50 deep tint (soft bg) · 500 solid · 600 hover · 700 bright text. */
-  --color-accent-50:  #06231f;
-  --color-accent-100: #0a3a34;
-  --color-accent-200: #115e56;
-  --color-accent-300: #0f766e;
-  --color-accent-400: #14b8a6;
-  --color-accent-500: #0d9488;
-  --color-accent-600: #0a7d72;
-  --color-accent-700: #5eead4;
+  --color-accent-50: #101010;
+  --color-accent-100: #171717;
+  --color-accent-200: #222222;
+  --color-accent-300: #303030;
+  --color-accent-400: #4a4a4a;
+  --color-accent-500: #303030;
+  --color-accent-600: #454545;
+  --color-accent-700: #f5f5f5;
 
-  /* Secondary (amber — money cue; inbound bar). */
-  --color-secondary-50:  #3a2a06;
-  --color-secondary-100: #4a3708;
-  --color-secondary-500: #f59e0b;
-  --color-secondary-600: #d97706;
-  --color-secondary-700: #fbbf24;
+  --color-secondary-50: #101010;
+  --color-secondary-100: #181818;
+  --color-secondary-500: #a3a3a3;
+  --color-secondary-600: #c7c7c7;
+  --color-secondary-700: #f0f0f0;
 
-  /* Status — success. */
-  --color-success-50:  #062a17;
-  --color-success-100: #08361f;
-  --color-success-500: #22c55e;
-  --color-success-600: #16a34a;
-  --color-success-700: #4ade80;
+  --color-success-50: #111111;
+  --color-success-100: #181818;
+  --color-success-500: #f5f5f5;
+  --color-success-600: #e5e5e5;
+  --color-success-700: #ffffff;
 
-  /* Status — warning (amber). */
-  --color-warning-50:  #3a2a06;
-  --color-warning-100: #4a3708;
-  --color-warning-500: #f59e0b;
-  --color-warning-600: #d97706;
-  --color-warning-700: #fbbf24;
+  --color-warning-50: #121212;
+  --color-warning-100: #1b1b1b;
+  --color-warning-500: #b8b8b8;
+  --color-warning-600: #d0d0d0;
+  --color-warning-700: #f0f0f0;
 
-  /* Status — danger. */
-  --color-danger-50:  #2a0a0a;
-  --color-danger-100: #3a0f0f;
-  --color-danger-500: #ef4444;
-  --color-danger-600: #dc2626;
-  --color-danger-700: #fca5a5;
+  --color-danger-50: #0d0d0d;
+  --color-danger-100: #171717;
+  --color-danger-500: #777777;
+  --color-danger-600: #8f8f8f;
+  --color-danger-700: #d8d8d8;
 
-  /* Status — info (blue). */
-  --color-info-50:  #0a1f3d;
-  --color-info-100: #12294d;
-  --color-info-500: #3b82f6;
-  --color-info-600: #2563eb;
-  --color-info-700: #93c5fd;
+  --color-info-50: #101010;
+  --color-info-100: #181818;
+  --color-info-500: #d4d4d4;
+  --color-info-600: #e7e7e7;
+  --color-info-700: #ffffff;
+
+  --color-shell: #f6f6f2;
+  --color-shell-muted: #efefea;
+  --color-panel: #fafaf8;
+  --color-line: #d8d8d2;
+  --color-ink-editorial: #101010;
+  --color-copy: #6d6d6d;
+  --color-faint: #999999;
+  --color-machine: #0a0a0a;
+  --color-machine-panel: #101010;
+  --color-machine-panel-high: #151515;
+  --color-ink-hover: #262626;
 
   --radius-md: 6px;
   --radius-lg: 8px;
@@ -82,8 +82,12 @@
 }
 
 @keyframes shimmer {
-  0%   { background-position: -200% 0; }
-  100% { background-position:  200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 :root {
@@ -98,14 +102,13 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  /* Tabular numerals for any money/metric element. */
   .tabular,
   [data-numeric] {
     font-feature-settings: 'tnum' on, 'lnum' on;
   }
 
   *:focus-visible {
-    outline: 2px solid var(--color-accent-500);
+    outline: 2px solid rgba(255, 255, 255, 0.78);
     outline-offset: 2px;
   }
 }

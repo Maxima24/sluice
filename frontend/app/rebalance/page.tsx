@@ -1,36 +1,22 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
-import { Scale, RefreshCw } from 'lucide-react';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { Card, CardHeader, CardTitle, CardBody } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { FormField } from '@/components/ui/FormField';
-import { Badge } from '@/components/ui/Badge';
-import { AlertBanner } from '@/components/ui/AlertBanner';
-import { StatusDot } from '@/components/ui/StatusDot';
-import { EmptyState } from '@/components/ui/EmptyState';
-import type { StatusTone } from '@/components/ui/types';
-import { cn } from '@/lib/utils';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { ArrowRight, RefreshCw, Scale } from 'lucide-react';
+import { CanvasAppShell, CanvasWorkspace, WorkspaceHeader, WorkspacePanel } from '@/components/canvas-dashboard/CanvasAppShell';
 import { useChannelHealth } from '@/lib/queries/channels';
 import { useCreateRebalance, useRebalanceJob } from '@/lib/queries/rebalance';
 import { rebalanceSchema } from '@/lib/rebalance-schema';
+import { focusWorkspaceModule } from '@/lib/workspace';
 import { formatCkb, truncateId } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import type { RebalanceRequest } from '@/types/fiber';
 
 const STEPS = ['PENDING', 'BUILDING', 'INFLIGHT', 'SUCCEEDED'] as const;
 
-function statusTone(status: string): StatusTone {
-  if (status === 'SUCCEEDED') return 'success';
-  if (status === 'FAILED') return 'danger';
-  return 'warning';
-}
-
 export default function RebalancePage() {
   const health = useChannelHealth();
-  const channelIds = health.data?.channels.map((c) => c.channelId) ?? [];
-
+  const channelIds = health.data?.channels.map((channel) => channel.channelId) ?? [];
+  const channels = health.data?.channels ?? [];
   const [sourceChannelId, setSource] = useState('');
   const [destChannelId, setDest] = useState('');
   const [amount, setAmount] = useState('');
@@ -42,201 +28,244 @@ export default function RebalancePage() {
   const create = useCreateRebalance();
   const job = useRebalanceJob(jobId);
   const current = job.data ?? create.data ?? null;
+  const currentIndex = current ? STEPS.indexOf(current.status as (typeof STEPS)[number]) : -1;
 
-  // client-only (avoids SSR/CSR hydration mismatch)
   useEffect(() => {
-    if (!idempotencyKey) setKey(crypto.randomUUID());
+    if (idempotencyKey) return;
+    const timer = window.setTimeout(() => setKey(crypto.randomUUID()), 0);
+    return () => window.clearTimeout(timer);
   }, [idempotencyKey]);
 
-  function submit(e: FormEvent) {
-    e.preventDefault();
+  function submit(event: FormEvent) {
+    event.preventDefault();
     const parsed = rebalanceSchema.safeParse({ sourceChannelId, destChannelId, amount, maxFee });
     if (!parsed.success) {
-      const fe: Record<string, string> = {};
-      for (const issue of parsed.error.issues) fe[String(issue.path[0])] = issue.message;
-      setErrors(fe);
+      const nextErrors: Record<string, string> = {};
+      for (const issue of parsed.error.issues) nextErrors[String(issue.path[0])] = issue.message;
+      setErrors(nextErrors);
       return;
     }
+
     setErrors({});
+    focusWorkspaceModule('rebalance');
     const body: RebalanceRequest = { ...parsed.data, idempotencyKey };
-    create.mutate(body, { onSuccess: (d) => setJobId(d.id) });
-  }
-
-  const currentIdx = current ? STEPS.indexOf(current.status as (typeof STEPS)[number]) : -1;
-  const running = !!current && ['PENDING', 'BUILDING', 'INFLIGHT'].includes(current.status);
-
-  function stepTone(i: number): StatusTone {
-    if (!current) return 'neutral';
-    if (current.status === 'SUCCEEDED') return 'success';
-    if (current.status === 'FAILED') return i <= 1 ? 'success' : i === 2 ? 'danger' : 'neutral';
-    if (i < currentIdx) return 'success';
-    if (i === currentIdx) return 'warning';
-    return 'neutral';
+    create.mutate(body, { onSuccess: (data) => setJobId(data.id) });
   }
 
   return (
-    <div>
-      <PageHeader
-        title="Rebalance"
-        description="Move liquidity via a circular self-payment — runs off the request path, idempotent."
-      />
-      <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-2">
-        <Card className="self-start">
-          <CardHeader>
-            <CardTitle>New rebalance</CardTitle>
-          </CardHeader>
-          <CardBody>
-            <form onSubmit={submit} className="space-y-4">
-              <FormField label="Source channel (over-funded)" required error={errors.sourceChannelId} htmlFor="src">
-                <Input
-                  id="src"
-                  list="rb-channels"
-                  value={sourceChannelId}
-                  onChange={(e) => setSource(e.target.value)}
-                  placeholder="0x…"
-                  className="font-mono"
-                  invalid={!!errors.sourceChannelId}
-                />
-              </FormField>
-              <FormField label="Destination channel (depleted)" required error={errors.destChannelId} htmlFor="dst">
-                <Input
-                  id="dst"
-                  list="rb-channels"
-                  value={destChannelId}
-                  onChange={(e) => setDest(e.target.value)}
-                  placeholder="0x…"
-                  className="font-mono"
-                  invalid={!!errors.destChannelId}
-                />
-              </FormField>
-              <datalist id="rb-channels">
-                {channelIds.map((id) => (
-                  <option key={id} value={id} />
-                ))}
-              </datalist>
+    <CanvasAppShell active="rebalance" breadcrumb="Liquidity Layer / Rebalancing">
+      <CanvasWorkspace>
+        <WorkspaceHeader
+          eyebrow="circular self-payment"
+          title="Rebalancing"
+          description="Move liquidity from over-funded channels to depleted channels while keeping every circular payment idempotent and auditable."
+          action={
+            <button
+              type="button"
+              onClick={() => {
+                setKey(crypto.randomUUID());
+                focusWorkspaceModule('rebalance');
+              }}
+              className="hidden h-11 shrink-0 items-center gap-2 rounded-[4px] border border-line bg-panel px-3 text-xs font-black uppercase tracking-[0.12em] text-ink-editorial transition hover:border-ink-editorial sm:flex"
+            >
+              <RefreshCw className="h-4 w-4" />
+              New key
+            </button>
+          }
+        />
 
-              <div className="grid grid-cols-2 gap-3">
-                <FormField label="Amount" required hint="shannon" error={errors.amount} htmlFor="amt">
-                  <Input
-                    id="amt"
-                    inputMode="numeric"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="100000000"
-                    className="tabular-nums"
-                    invalid={!!errors.amount}
-                  />
-                </FormField>
-                <FormField label="Max fee" required hint="shannon" error={errors.maxFee} htmlFor="fee">
-                  <Input
-                    id="fee"
-                    inputMode="numeric"
-                    value={maxFee}
-                    onChange={(e) => setMaxFee(e.target.value)}
-                    placeholder="1000000"
-                    className="tabular-nums"
-                    invalid={!!errors.maxFee}
-                  />
-                </FormField>
-              </div>
+        <WorkspacePanel>
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-faint">input</p>
+              <h2 className="mt-1 text-lg font-black uppercase tracking-[0.04em]">Queue movement</h2>
+            </div>
+            <Scale className="h-5 w-5 text-copy" />
+          </div>
 
-              <FormField
-                label="Idempotency key"
-                hint="Resubmitting the same key returns the same job — never executes twice."
-              >
-                <div className="flex items-center gap-2">
-                  <Input value={idempotencyKey} onChange={(e) => setKey(e.target.value)} className="font-mono text-xs" />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setKey(crypto.randomUUID())}
-                    leadingIcon={<RefreshCw className="h-3.5 w-3.5" />}
-                  >
-                    New
-                  </Button>
-                </div>
-              </FormField>
+          <form onSubmit={submit} className="space-y-4">
+            <ConsoleField label="Source channel" hint="over-funded" error={errors.sourceChannelId}>
+              <ConsoleInput value={sourceChannelId} onChange={setSource} placeholder="0x..." list="rb-channels" />
+            </ConsoleField>
+            <ConsoleField label="Destination channel" hint="depleted" error={errors.destChannelId}>
+              <ConsoleInput value={destChannelId} onChange={setDest} placeholder="0x..." list="rb-channels" />
+            </ConsoleField>
+            <datalist id="rb-channels">
+              {channelIds.map((id) => (
+                <option key={id} value={id} />
+              ))}
+            </datalist>
 
-              <Button type="submit" loading={create.isPending}>
-                Queue rebalance
-              </Button>
-              {channelIds.length === 0 ? (
-                <p className="text-xs text-neutral-500">
-                  No channels detected — you can still submit to see the flow (it will fail “channel not found”).
-                </p>
-              ) : null}
-            </form>
-          </CardBody>
-        </Card>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <ConsoleField label="Amount" hint="shannon" error={errors.amount}>
+                <ConsoleInput value={amount} onChange={setAmount} placeholder="100000000" inputMode="numeric" />
+              </ConsoleField>
+              <ConsoleField label="Max fee" hint="shannon" error={errors.maxFee}>
+                <ConsoleInput value={maxFee} onChange={setMaxFee} placeholder="1000000" inputMode="numeric" />
+              </ConsoleField>
+            </div>
 
-        <div className="space-y-4">
-          {create.isError ? (
-            <AlertBanner tone="danger" title="Could not queue" description={(create.error as Error)?.message} />
-          ) : null}
+            <ConsoleField label="Idempotency key">
+              <ConsoleInput value={idempotencyKey} onChange={setKey} placeholder="request key" />
+            </ConsoleField>
+
+            <button
+              type="submit"
+              disabled={create.isPending}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-[4px] border border-ink-editorial bg-ink-editorial text-sm font-black uppercase tracking-[0.12em] text-panel transition hover:bg-ink-hover disabled:opacity-55"
+            >
+              {create.isPending ? 'Queuing rebalance' : 'Queue rebalance'}
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </form>
+        </WorkspacePanel>
+
+        <WorkspacePanel className="mt-4">
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-faint">job</p>
+              <h2 className="mt-1 truncate text-lg font-black uppercase tracking-[0.04em]">{current ? `Job ${truncateId(current.id, 6, 4)}` : 'No job queued'}</h2>
+            </div>
+            <JobBadge status={current?.status} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            {STEPS.map((step, index) => {
+              const active = current ? index <= currentIndex || current.status === 'SUCCEEDED' : false;
+              const failed = current?.status === 'FAILED' && index >= 2;
+              return (
+                <button
+                  key={step}
+                  type="button"
+                  onClick={() => focusWorkspaceModule('rebalance')}
+                  className={cn(
+                    'rounded-[4px] border p-3 text-left transition hover:border-ink-editorial',
+                    active ? 'border-ink-editorial bg-shell-muted' : failed ? 'border-ink-editorial bg-shell-muted' : 'border-line bg-panel',
+                  )}
+                >
+                  <span className={cn('block h-2 w-2 rounded-full', active || failed ? 'bg-ink-editorial' : 'bg-faint')} />
+                  <p className="mt-4 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-copy">{step}</p>
+                </button>
+              );
+            })}
+          </div>
+
+          {create.isError ? <ResultMessage title="Could not queue" body={(create.error as Error)?.message} /> : null}
+          {current?.status === 'FAILED' && current.error ? <ResultMessage title="Rebalance failed" body={current.error} /> : null}
 
           {current ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Job {truncateId(current.id, 6, 4)}</CardTitle>
-                <Badge tone={statusTone(current.status)}>{current.status}</Badge>
-              </CardHeader>
-              <CardBody className="space-y-4">
-                <div className="flex items-center gap-1.5">
-                  {STEPS.map((s, i) => (
-                    <div key={s} className="flex flex-1 items-center gap-1.5">
-                      <StatusDot tone={stepTone(i)} pulse={i === currentIdx && running} />
-                      <span className={cn('text-[11px]', stepTone(i) === 'neutral' ? 'text-neutral-500' : 'text-neutral-700')}>
-                        {s}
-                      </span>
-                      {i < STEPS.length - 1 ? <span className="h-px flex-1 bg-outline" /> : null}
-                    </div>
-                  ))}
-                </div>
-
-                {current.status === 'FAILED' && current.error ? (
-                  <AlertBanner tone="danger" title="Rebalance failed" description={current.error} />
-                ) : null}
-
-                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-                  <dt className="text-neutral-500">Amount</dt>
-                  <dd className="tabular-nums text-neutral-900" data-numeric>
-                    {formatCkb(current.amount)}
-                  </dd>
-                  <dt className="text-neutral-500">Max fee</dt>
-                  <dd className="tabular-nums text-neutral-900" data-numeric>
-                    {formatCkb(current.maxFee)}
-                  </dd>
-                  {current.feePaid ? (
-                    <>
-                      <dt className="text-neutral-500">Fee paid</dt>
-                      <dd className="tabular-nums text-success-600" data-numeric>
-                        {formatCkb(current.feePaid)}
-                      </dd>
-                    </>
-                  ) : null}
-                  <dt className="text-neutral-500">Source</dt>
-                  <dd className="truncate font-mono text-xs text-neutral-700">{truncateId(current.sourceChannelId)}</dd>
-                  <dt className="text-neutral-500">Dest</dt>
-                  <dd className="truncate font-mono text-xs text-neutral-700">{truncateId(current.destChannelId)}</dd>
-                  {current.paymentHash ? (
-                    <>
-                      <dt className="text-neutral-500">Payment</dt>
-                      <dd className="truncate font-mono text-xs text-neutral-700">{truncateId(current.paymentHash)}</dd>
-                    </>
-                  ) : null}
-                </dl>
-              </CardBody>
-            </Card>
+            <div className="mt-4 grid gap-3 rounded-[4px] border border-line bg-shell-muted p-3 sm:grid-cols-2">
+              <DataLine label="Amount" value={formatCkb(current.amount)} />
+              <DataLine label="Max fee" value={formatCkb(current.maxFee)} />
+              <DataLine label="Source" value={truncateId(current.sourceChannelId)} />
+              <DataLine label="Destination" value={truncateId(current.destChannelId)} />
+            </div>
           ) : (
-            <EmptyState
-              icon={<Scale className="h-5 w-5" />}
-              title="No job yet"
-              description="Queue a rebalance to watch it progress here."
-            />
+            <p className="mt-4 rounded-[4px] border border-dashed border-line bg-shell-muted p-4 text-sm leading-6 text-copy">
+              Queue a rebalance to watch liquidity movement animate in the center workspace.
+            </p>
           )}
-        </div>
-      </div>
+        </WorkspacePanel>
+
+        <WorkspacePanel className="mt-4">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-black uppercase tracking-[0.08em]">Channel candidates</h2>
+            <span className="rounded-[4px] border border-line px-2 py-1 font-mono text-[10px] text-copy">
+              {channels.length} channels
+            </span>
+          </div>
+          <div className="space-y-2">
+            {(channels.length
+              ? channels.slice(0, 6)
+              : Array.from({ length: 4 }, (_, index) => ({
+                  channelId: `placeholder-${index}`,
+                  outbound: '0',
+                  inboundRatio: 0.35 + index * 0.12,
+                  isUdt: false,
+                }))
+            ).map((channel) => (
+              <button
+                key={channel.channelId}
+                type="button"
+                onClick={() => focusWorkspaceModule('channels')}
+                className="block w-full rounded-[4px] border border-line bg-panel p-3 text-left transition hover:border-ink-editorial"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="truncate font-mono text-xs font-bold text-ink-editorial">{truncateId(channel.channelId)}</span>
+                  <span className="text-xs text-copy">{formatCkb(channel.outbound, { withUnit: !channel.isUdt })}</span>
+                </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-none bg-shell-muted">
+                  <span className="block h-full rounded-none bg-ink-editorial" style={{ width: `${Math.round((1 - channel.inboundRatio) * 100)}%` }} />
+                </div>
+              </button>
+            ))}
+          </div>
+        </WorkspacePanel>
+      </CanvasWorkspace>
+    </CanvasAppShell>
+  );
+}
+
+function ConsoleField({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: ReactNode }) {
+  return (
+    <label className="block">
+      <span className="flex items-center justify-between font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-faint">
+        {label}
+        {hint ? <span className="font-normal normal-case tracking-normal text-faint">{hint}</span> : null}
+      </span>
+      <span className="mt-2 block">{children}</span>
+      {error ? <span className="mt-1 block text-xs text-ink-editorial">{error}</span> : null}
+    </label>
+  );
+}
+
+function ConsoleInput({
+  value,
+  onChange,
+  placeholder,
+  inputMode,
+  list,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  inputMode?: 'numeric';
+  list?: string;
+}) {
+  return (
+    <input
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder={placeholder}
+      inputMode={inputMode}
+      list={list}
+      className="h-11 w-full rounded-[4px] border border-line bg-panel px-3 font-mono text-sm text-ink-editorial outline-none transition placeholder:text-faint focus:border-ink-editorial"
+    />
+  );
+}
+
+function JobBadge({ status }: { status?: string }) {
+  return (
+    <span className="rounded-[4px] border border-line bg-panel px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-copy">
+      {status ?? 'Idle'}
+    </span>
+  );
+}
+
+function ResultMessage({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="mt-4 rounded-[4px] border border-line bg-shell-muted p-4">
+      <p className="font-black uppercase tracking-[0.04em] text-ink-editorial">{title}</p>
+      <p className="mt-1 text-sm leading-6 text-copy">{body}</p>
+    </div>
+  );
+}
+
+function DataLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-faint">{label}</p>
+      <p className="mt-1 truncate font-mono text-sm font-semibold text-ink-editorial">{value}</p>
     </div>
   );
 }
