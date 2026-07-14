@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type FormEvent, type ReactNode } from 'react';
+import { motion } from 'framer-motion';
 import { ArrowRight, CircleCheck, CircleX, Gauge, Radar } from 'lucide-react';
 import { CanvasAppShell, CanvasWorkspace, WorkspaceHeader, WorkspacePanel } from '@/components/canvas-dashboard/CanvasAppShell';
 import { useProbe } from '@/lib/queries/probe';
@@ -61,21 +62,7 @@ export default function ProbePage() {
           </div>
 
           <form onSubmit={submit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-1 rounded-[4px] border border-line bg-shell-muted p-1">
-              {(['pubkey', 'invoice'] as const).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setMode(item)}
-                  className={cn(
-                    'rounded-[3px] px-3 py-2 text-xs font-black uppercase tracking-[0.12em] transition',
-                    mode === item ? 'bg-ink-editorial text-panel' : 'text-copy hover:text-ink-editorial',
-                  )}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
+            <PaymentModeToggle mode={mode} onChange={setMode} />
 
             {mode === 'pubkey' ? (
               <ConsoleField label="Target pubkey" error={errors.targetPubkey}>
@@ -101,7 +88,7 @@ export default function ProbePage() {
               disabled={probe.isPending}
               className="flex h-11 w-full items-center justify-center gap-2 rounded-[4px] border border-ink-editorial bg-ink-editorial text-sm font-black uppercase tracking-[0.12em] text-panel transition hover:bg-ink-hover disabled:opacity-55"
             >
-              {probe.isPending ? 'Probing route' : 'Probe route'}
+              <span>{probe.isPending ? 'Probing route' : 'Probe route'}</span>
               <ArrowRight className="h-4 w-4" />
             </button>
           </form>
@@ -175,6 +162,44 @@ export default function ProbePage() {
   );
 }
 
+function PaymentModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: 'pubkey' | 'invoice';
+  onChange: (mode: 'pubkey' | 'invoice') => void;
+}) {
+  const modes = ['pubkey', 'invoice'] as const;
+
+  return (
+    <div
+      data-no-magnetic
+      className="relative grid grid-cols-2 overflow-hidden rounded-full border border-line bg-shell-muted p-1"
+    >
+      <motion.span
+        aria-hidden
+        className="absolute bottom-1 left-1 top-1 w-[calc(50%-0.25rem)] rounded-[22px] bg-ink-editorial"
+        animate={{ x: mode === 'invoice' ? '100%' : '0%' }}
+        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      />
+      {modes.map((item) => (
+        <button
+          key={item}
+          type="button"
+          data-no-magnetic
+          onClick={() => onChange(item)}
+          className={cn(
+            'relative z-10 rounded-[22px] px-3 py-2 text-xs font-black uppercase tracking-[0.18em] transition',
+            mode === item ? 'text-panel' : 'text-copy hover:text-ink-editorial',
+          )}
+        >
+          <span>{item}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function ConsoleField({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: ReactNode }) {
   return (
     <label className="block">
@@ -212,7 +237,7 @@ function ConsoleInput({
 
 function StatusBadge({ payable, pending }: { payable?: boolean; pending: boolean }) {
   const label = pending ? 'Running' : payable === undefined ? 'Idle' : payable ? 'Payable' : 'Blocked';
-  return <span className="hidden rounded-[4px] border border-line bg-panel px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-copy sm:inline-flex">{label}</span>;
+  return <span className="hidden rounded-[18px] border border-line bg-panel px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-copy sm:inline-flex">{label}</span>;
 }
 
 function ResultBanner({ tone, title, body }: { tone: 'success' | 'danger'; title: string; body: string }) {

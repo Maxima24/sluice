@@ -13,6 +13,7 @@ export function NodeIdentityPanel({
   isPending: boolean;
   isError: boolean;
 }) {
+  const skeletonRows = ['w-[10ch]', 'w-[14ch]', 'w-[22ch]', 'w-[22ch]', 'w-[3ch]'];
   const rows: [string, ReactNode][] = info
     ? [
         ['Version', info.version],
@@ -31,8 +32,8 @@ export function NodeIdentityPanel({
       <div className="p-5">
         {isPending ? (
           <div className="space-y-2.5">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-4 w-full" />
+            {skeletonRows.map((width, i) => (
+              <Skeleton key={i} className={`h-4 ${width} max-w-full`} />
             ))}
           </div>
         ) : isError || !info ? (

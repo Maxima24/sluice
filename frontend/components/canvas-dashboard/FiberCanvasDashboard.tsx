@@ -2,7 +2,7 @@
 
 import { Activity, AlertTriangle, ArrowRight, BarChart3, GitBranch, Radar, RefreshCw } from 'lucide-react';
 import { type ReactNode } from 'react';
-import { CanvasAppShell, CanvasWorkspace, WorkspaceHeader, WorkspacePanel } from './CanvasAppShell';
+import { CanvasAppShell, CanvasWorkspace, WorkspaceActionButton, WorkspaceHeader, WorkspacePanel } from './CanvasAppShell';
 import { focusWorkspaceModule, type WorkspaceModuleId } from '@/lib/workspace';
 
 const overviewCards: Array<{
@@ -11,10 +11,22 @@ const overviewCards: Array<{
   detail: string;
   moduleId: WorkspaceModuleId;
 }> = [
-  { label: 'Liquidity health', value: '78%', detail: '2 channels need attention', moduleId: 'liquidity' },
-  { label: 'Route confidence', value: '82%', detail: '3 alternative paths ready', moduleId: 'route-probe' },
-  { label: 'Active peers', value: '7', detail: 'live topology synchronized', moduleId: 'network' },
-  { label: 'Drift', value: '0.02', detail: 'inside tolerance window', moduleId: 'reconciliation' },
+  { label: 'Liquidity health', value: '78%', detail: '2 channels below outbound target', moduleId: 'liquidity' },
+  { label: 'Route readiness', value: '82%', detail: '3 payable alternatives pre-computed', moduleId: 'route-probe' },
+  { label: 'Settlement window', value: '60ms', detail: 'latest pre-flight decision latency', moduleId: 'network' },
+  { label: 'Ledger drift', value: '0.02', detail: 'inside double-entry tolerance', moduleId: 'reconciliation' },
+];
+
+const capacityRows: Array<{
+  label: string;
+  value: number;
+  status: string;
+  moduleId: WorkspaceModuleId;
+}> = [
+  { label: 'alpha / beta', value: 78, status: 'balanced', moduleId: 'liquidity' },
+  { label: 'alpha / delta', value: 44, status: 'watch outbound', moduleId: 'channels' },
+  { label: 'alpha / kappa', value: 18, status: 'critical bottleneck', moduleId: 'alerts' },
+  { label: 'alpha / omega', value: 64, status: 'recovering', moduleId: 'rebalance' },
 ];
 
 export function FiberCanvasDashboard() {
@@ -22,18 +34,13 @@ export function FiberCanvasDashboard() {
     <CanvasAppShell active="overview" breadcrumb="Liquidity Layer / Command Center">
       <CanvasWorkspace>
         <WorkspaceHeader
-          eyebrow="operator console"
-          title="Command Center"
-          description="The console reads the Fiber node state while the workspace remains interactive. Select a metric to move the camera to its operational object."
+          eyebrow="fiber control surface"
+          title="Liquidity OS"
+          description="Operate your Fiber node from one synchronized surface. Watch capacity drift, test payment routes before execution, and stage rebalances while the workspace camera follows the exact channel, route, or alert behind each signal."
           action={
-            <button
-              type="button"
-              onClick={() => focusWorkspaceModule('route-probe')}
-              className="hidden h-11 shrink-0 items-center gap-2 rounded-[4px] border border-ink-editorial bg-ink-editorial px-4 text-xs font-black uppercase tracking-[0.12em] text-panel transition hover:bg-ink-hover sm:flex"
-            >
-              Can I Pay?
-              <ArrowRight className="h-4 w-4" />
-            </button>
+            <WorkspaceActionButton onClick={() => focusWorkspaceModule('route-probe')} icon={<ArrowRight className="h-4 w-4" />}>
+              Probe route
+            </WorkspaceActionButton>
           }
         />
 
@@ -59,36 +66,38 @@ export function FiberCanvasDashboard() {
             </div>
             <div>
               <h2 className="text-sm font-black uppercase tracking-[0.08em]">Operational flow</h2>
-              <p className="mt-1 text-xs text-copy">Panel selections fly the workspace camera to the relevant module.</p>
+              <p className="mt-1 text-xs text-copy">Every action keeps the operator console and workspace camera synchronized.</p>
             </div>
           </div>
           <div className="mt-5 space-y-2">
-            <ConsoleAction icon={<GitBranch className="h-4 w-4" />} label="Inspect Channel 4" moduleId="channels" />
-            <ConsoleAction icon={<Radar className="h-4 w-4" />} label="Run route simulation" moduleId="route-probe" />
-            <ConsoleAction icon={<RefreshCw className="h-4 w-4" />} label="Open rebalancing engine" moduleId="rebalance" />
-            <ConsoleAction icon={<AlertTriangle className="h-4 w-4" />} label="Review alert timeline" moduleId="alerts" />
+            <ConsoleAction icon={<GitBranch className="h-4 w-4" />} label="Inspect thin outbound channel" moduleId="channels" />
+            <ConsoleAction icon={<Radar className="h-4 w-4" />} label="Probe payment before attempting" moduleId="route-probe" />
+            <ConsoleAction icon={<RefreshCw className="h-4 w-4" />} label="Stage circular rebalance" moduleId="rebalance" />
+            <ConsoleAction icon={<AlertTriangle className="h-4 w-4" />} label="Review failure and drift signals" moduleId="alerts" />
           </div>
         </WorkspacePanel>
 
-        <WorkspacePanel className="mt-4">
+        <WorkspacePanel className="mt-4" data-no-magnetic>
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-black uppercase tracking-[0.08em]">Live capacity surface</h2>
             <BarChart3 className="h-4 w-4 text-faint" />
           </div>
           <div className="space-y-4">
-            {[78, 44, 18, 64].map((value, index) => (
+            {capacityRows.map((row) => (
               <button
-                key={index}
+                key={row.label}
                 type="button"
-                onClick={() => focusWorkspaceModule(index === 2 ? 'alerts' : 'liquidity')}
-                className="block w-full text-left"
+                data-no-magnetic
+                onClick={() => focusWorkspaceModule(row.moduleId)}
+                className="block w-full rounded-[24px] border border-transparent px-4 py-3 text-left transition hover:border-line hover:bg-shell-muted"
               >
                 <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.18em] text-faint">
-                  <span>channel {index + 1}</span>
-                  <span>{value}%</span>
+                  <span>{row.label}</span>
+                  <span>{row.value}%</span>
                 </div>
+                <p className="mt-1 text-xs text-copy">{row.status}</p>
                 <div className="mt-2 h-2 overflow-hidden rounded-none bg-shell-muted">
-                  <span className="block h-full rounded-none bg-ink-editorial transition-[width] duration-700" style={{ width: `${value}%` }} />
+                  <span className="block h-full rounded-none bg-ink-editorial transition-[width] duration-700" style={{ width: `${row.value}%` }} />
                 </div>
               </button>
             ))}

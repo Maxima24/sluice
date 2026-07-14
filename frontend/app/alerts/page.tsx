@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertTriangle, Bell } from 'lucide-react';
-import { CanvasAppShell, CanvasWorkspace, WorkspaceHeader, WorkspacePanel } from '@/components/canvas-dashboard/CanvasAppShell';
+import { CanvasAppShell, CanvasWorkspace, WorkspaceActionButton, WorkspaceHeader, WorkspacePanel } from '@/components/canvas-dashboard/CanvasAppShell';
 import { useChannelHealth } from '@/lib/queries/channels';
 import { focusWorkspaceModule } from '@/lib/workspace';
 import { formatCkb, truncateId } from '@/lib/format';
@@ -37,14 +37,9 @@ export default function AlertsPage() {
           title="Alerts"
           description="Surface channel conditions that can lead to failed payments, stale state, or unreliable route decisions."
           action={
-            <button
-              type="button"
-              onClick={() => focusWorkspaceModule('alerts')}
-              className="hidden h-11 shrink-0 items-center gap-2 rounded-[4px] border border-ink-editorial bg-ink-editorial px-4 text-xs font-black uppercase tracking-[0.12em] text-panel transition hover:bg-ink-hover sm:flex"
-            >
-              <Bell className="h-4 w-4" />
+            <WorkspaceActionButton onClick={() => focusWorkspaceModule('alerts')} icon={<Bell className="h-4 w-4" />}>
               Focus alerts
-            </button>
+            </WorkspaceActionButton>
           }
         />
 

@@ -1,8 +1,22 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-ui: var(--font-manrope), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-body: var(--font-manrope), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-control: var(--font-oxanium), var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-ibm-plex-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-display: var(--font-oxanium), var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-number: var(--font-ibm-plex-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --text-loading-title: 90px;
+  --text-hero-title: 64px;
+  --text-dashboard-title: 48px;
+  --text-panel-heading: 28px;
+  --text-section-label: 12px;
+  --text-body-copy: 15px;
+  --text-metric: 52px;
+  --text-small-caption: 11px;
 
   --color-neutral-50: #050505;
   --color-neutral-100: #0b0b0b;
@@ -74,9 +88,11 @@
   --color-machine-panel-high: #151515;
   --color-ink-hover: #262626;
 
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
+  --radius-md: 28px;
+  --radius-lg: 28px;
+  --radius-xl: 28px;
+  --radius-app: 28px;
+  --radius-shell: 36px;
 
   --animate-shimmer: shimmer 2s ease-in-out infinite;
 }
@@ -90,25 +106,341 @@
   }
 }
 
+@keyframes workspace-card-orbit {
+  0% {
+    background-position:
+      0 0,
+      0 0;
+  }
+  100% {
+    background-position:
+      180px 120px,
+      -140px 160px;
+  }
+}
+
+@keyframes workspace-cursor-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 9px rgba(255, 255, 255, 0);
+  }
+}
+
 :root {
   color-scheme: dark;
 }
 
 @layer base {
+  @media (max-width: 639px) {
+    :root {
+      --radius-md: 22px;
+      --radius-lg: 22px;
+      --radius-xl: 22px;
+      --radius-app: 22px;
+      --radius-shell: 26px;
+      --text-dashboard-title: 38px;
+      --text-panel-heading: 24px;
+      --text-body-copy: 14px;
+      --text-metric: 42px;
+    }
+  }
+
   body {
     background: var(--color-surface);
     color: var(--color-ink);
-    font-family: var(--font-sans);
+    font-family: var(--font-ui);
+    font-size: var(--text-body-copy);
     -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+  }
+
+  :where(p, span, li, td, th, label, input, textarea, select, button, a) {
+    font-family: var(--font-body);
+  }
+
+  :where(button, [role='button'], nav, kbd) {
+    font-family: var(--font-control);
+  }
+
+  :where(button, a[href], [role='button']) {
+    cursor: pointer;
+  }
+
+  :where(button:disabled, [aria-disabled='true']) {
+    cursor: not-allowed;
   }
 
   .tabular,
   [data-numeric] {
+    font-family: var(--font-number);
     font-feature-settings: 'tnum' on, 'lnum' on;
+  }
+
+  :where(h1, [data-display]) {
+    font-family: var(--font-display);
+    letter-spacing: -0.05em;
+  }
+
+  :where(h2, h3, [data-heading]) {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  :where(.font-mono, [data-label], [data-caption]) {
+    font-family: var(--font-mono);
+  }
+
+  :where([data-label]) {
+    font-size: var(--text-section-label);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+
+  :where([data-caption]) {
+    font-size: var(--text-small-caption);
+  }
+
+  :where([data-metric]) {
+    font-family: var(--font-mono);
+    font-size: var(--text-metric);
+    font-feature-settings: 'tnum' on, 'lnum' on;
+    letter-spacing: -0.04em;
   }
 
   *:focus-visible {
     outline: 2px solid rgba(255, 255, 255, 0.78);
     outline-offset: 2px;
   }
+
+  ::selection {
+    background: rgba(16, 16, 16, 0.92);
+    color: #fafaf8;
+  }
+}
+
+@layer components {
+  :where(button:not(:disabled):not([data-no-magnetic]), a[href]:not([data-no-magnetic]), [role='button']:not([data-no-magnetic])) {
+    --magnetic-x: 50%;
+    --magnetic-y: 50%;
+    --magnetic-size: 720px;
+    --magnetic-fill: var(--color-ink-editorial);
+    --magnetic-text-hover: var(--color-panel);
+    --magnetic-border-hover: var(--color-ink-editorial);
+    --magnetic-color-delay: 180ms;
+    isolation: isolate;
+    overflow: hidden;
+    position: relative;
+    transition:
+      color 320ms cubic-bezier(0.4, 0, 0.2, 1),
+      border-color 320ms cubic-bezier(0.4, 0, 0.2, 1),
+      background-color 320ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  :where(button:not(:disabled):not([data-no-magnetic]), a[href]:not([data-no-magnetic]), [role='button']:not([data-no-magnetic]))::before {
+    background: var(--magnetic-fill);
+    border-radius: 9999px;
+    content: '';
+    height: var(--magnetic-size);
+    left: var(--magnetic-x);
+    pointer-events: none;
+    position: absolute;
+    top: var(--magnetic-y);
+    transform: translate(-50%, -50%) scale(0);
+    transition: transform 700ms cubic-bezier(0.4, 0, 0.2, 1);
+    width: var(--magnetic-size);
+    z-index: 0;
+  }
+
+  :where(button:not(:disabled):not([data-no-magnetic]), a[href]:not([data-no-magnetic]), [role='button']:not([data-no-magnetic])):hover {
+    border-color: var(--magnetic-border-hover) !important;
+  }
+
+  :where(button:not(:disabled):not([data-no-magnetic]), a[href]:not([data-no-magnetic]), [role='button']:not([data-no-magnetic])):hover::before {
+    transform: translate(-50%, -50%) scale(1);
+    transition-duration: 900ms;
+  }
+
+  :where(button:not(:disabled):not([data-no-magnetic]), a[href]:not([data-no-magnetic]), [role='button']:not([data-no-magnetic]))[data-magnetic-active='true'] {
+    color: var(--magnetic-text-hover) !important;
+  }
+
+  :where(button:not(:disabled):not([data-no-magnetic]), a[href]:not([data-no-magnetic]), [role='button']:not([data-no-magnetic]))[data-magnetic-active='true'] :where(*) {
+    color: var(--magnetic-text-hover) !important;
+  }
+
+  :where(button:not(:disabled):not([data-no-magnetic]), a[href]:not([data-no-magnetic]), [role='button']:not([data-no-magnetic]))[data-magnetic-active='true'] :where(svg, svg *) {
+    color: var(--magnetic-text-hover) !important;
+    stroke: currentColor !important;
+  }
+
+  :where(button:not(:disabled):not([data-no-magnetic]), a[href]:not([data-no-magnetic]), [role='button']:not([data-no-magnetic])) > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  [data-no-magnetic] :where(button, a[href], [role='button'])::before {
+    content: none !important;
+  }
+
+  @media (max-width: 767px), (hover: none) and (pointer: coarse) {
+    :where(button:not(:disabled):not([data-no-magnetic]), a[href]:not([data-no-magnetic]), [role='button']:not([data-no-magnetic])) {
+      --magnetic-fill: transparent;
+      --magnetic-text-hover: currentColor;
+    }
+
+    :where(button:not(:disabled):not([data-no-magnetic]), a[href]:not([data-no-magnetic]), [role='button']:not([data-no-magnetic]))::before {
+      content: none !important;
+      display: none !important;
+    }
+  }
+
+  .workspace-scrollbar {
+    scrollbar-color: rgba(255, 255, 255, 0.38) rgba(255, 255, 255, 0.055);
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+  }
+
+  .workspace-scrollbar::-webkit-scrollbar {
+    height: 10px;
+    width: 10px;
+  }
+
+  .workspace-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.055);
+    border-radius: 999px;
+  }
+
+  .workspace-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.56), rgba(255, 255, 255, 0.22));
+    border: 2px solid rgba(10, 10, 10, 0.84);
+    border-radius: 999px;
+  }
+
+  .workspace-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.72);
+  }
+
+  .operator-scrollbar {
+    scrollbar-color: #101010 transparent;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+  }
+
+  .operator-scrollbar::-webkit-scrollbar {
+    height: 14px;
+    width: 14px;
+  }
+
+  .operator-scrollbar::-webkit-scrollbar-track {
+    background:
+      linear-gradient(90deg, transparent 0 5px, #d8d8d2 5px 6px, transparent 6px 100%),
+      #f6f6f2;
+  }
+
+  .operator-scrollbar::-webkit-scrollbar-thumb {
+    background: #101010;
+    border: 4px solid #f6f6f2;
+    border-radius: 999px;
+    min-height: 56px;
+  }
+
+  .operator-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #3a3a3a;
+  }
+
+  .operator-scrollbar::-webkit-scrollbar-corner,
+  .operator-scrollbar::-webkit-scrollbar-button {
+    display: none;
+    height: 0;
+    width: 0;
+  }
+
+  @media (max-width: 639px) {
+    .operator-scrollbar {
+      scrollbar-gutter: auto;
+    }
+
+    .operator-scrollbar::-webkit-scrollbar {
+      height: 10px;
+      width: 10px;
+    }
+
+    .operator-scrollbar::-webkit-scrollbar-track {
+      background:
+        linear-gradient(90deg, transparent 0 4px, #d8d8d2 4px 5px, transparent 5px 100%),
+        #f6f6f2;
+    }
+
+    .operator-scrollbar::-webkit-scrollbar-thumb {
+      border-width: 3px;
+      min-height: 42px;
+    }
+  }
+
+  .workspace-module-card {
+    background:
+      radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.12), transparent 30%),
+      linear-gradient(145deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.018) 52%, rgba(255, 255, 255, 0.045)),
+      rgba(22, 22, 22, 0.55);
+    backdrop-filter: blur(28px) saturate(1.08);
+    -webkit-backdrop-filter: blur(28px) saturate(1.08);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-app) !important;
+    box-shadow:
+      0 22px 74px rgba(0, 0, 0, 0.44),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      inset 0 -28px 72px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+  }
+
+  .workspace-module-card::before {
+    animation: workspace-card-orbit 18s linear infinite;
+    background:
+      radial-gradient(circle at 18px 18px, rgba(255, 255, 255, 0.16) 0 1px, transparent 2px),
+      radial-gradient(circle at 48px 54px, rgba(255, 255, 255, 0.08) 0 1px, transparent 2px);
+    background-size:
+      96px 96px,
+      132px 132px;
+    content: '';
+    inset: 0;
+    opacity: 0.12;
+    pointer-events: none;
+    position: absolute;
+    z-index: 0;
+  }
+
+  .workspace-module-card::after {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.075), transparent 34%),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.04), transparent 18%, transparent 82%, rgba(255, 255, 255, 0.035));
+    content: "";
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+    z-index: 1;
+  }
+
+  .workspace-card-surface {
+    border-radius: var(--radius-app) !important;
+  }
+
+  .workspace-cursor-focus {
+    animation: workspace-cursor-pulse 2.2s ease-in-out infinite;
+  }
+
+  :where(button:not(.rounded-full), input, textarea, select, [data-ui-radius]),
+  :where([data-workspace-control], [data-workspace-control] button, [data-workspace-control] div):not(.rounded-full),
+  .operator-scrollbar :where(section, div, button, input, textarea, [role='button']):not(.rounded-full) {
+    border-radius: var(--radius-app) !important;
+  }
+
+  .workspace-module-card :where(button, input, textarea, [role='button']):not(.rounded-full) {
+    border-radius: 0 !important;
+  }
+
 }

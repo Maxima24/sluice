@@ -1,10 +1,11 @@
 'use client';
 
 import { BarChart3, Gauge } from 'lucide-react';
-import { CanvasAppShell, CanvasWorkspace, WorkspaceHeader, WorkspacePanel } from '@/components/canvas-dashboard/CanvasAppShell';
+import { CanvasAppShell, CanvasWorkspace, WorkspaceActionButton, WorkspaceHeader, WorkspacePanel } from '@/components/canvas-dashboard/CanvasAppShell';
 import { useChannelHealth } from '@/lib/queries/channels';
 import { focusWorkspaceModule } from '@/lib/workspace';
 import { formatCkb, sumShannon, truncateId } from '@/lib/format';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 export default function LiquidityPage() {
   const health = useChannelHealth();
@@ -21,21 +22,16 @@ export default function LiquidityPage() {
           title="Liquidity"
           description="Read outbound and inbound capacity as an operating surface. Thin channels become obvious before they become failed payments."
           action={
-            <button
-              type="button"
-              onClick={() => focusWorkspaceModule('liquidity')}
-              className="hidden h-11 shrink-0 items-center gap-2 rounded-[4px] border border-ink-editorial bg-ink-editorial px-4 text-xs font-black uppercase tracking-[0.12em] text-panel transition hover:bg-ink-hover sm:flex"
-            >
-              <BarChart3 className="h-4 w-4" />
+            <WorkspaceActionButton onClick={() => focusWorkspaceModule('liquidity')} icon={<BarChart3 className="h-4 w-4" />}>
               Focus liquidity
-            </button>
+            </WorkspaceActionButton>
           }
         />
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <Metric label="Outbound" value={formatCkb(outbound)} />
-          <Metric label="Inbound" value={formatCkb(inbound)} />
-          <Metric label="Warnings" value={String(warnings)} />
+          <Metric isPending={health.isPending} label="Outbound" value={formatCkb(outbound)} />
+          <Metric isPending={health.isPending} label="Inbound" value={formatCkb(inbound)} />
+          <Metric isPending={health.isPending} label="Warnings" value={String(warnings)} />
         </div>
 
         <WorkspacePanel className="mt-4">
@@ -46,6 +42,8 @@ export default function LiquidityPage() {
           <div className="space-y-4">
             {health.isError ? (
               <Empty text={(health.error as Error)?.message ?? 'Liquidity unavailable.'} />
+            ) : health.isPending ? (
+              <LiquidityListSkeleton />
             ) : channels.length ? (
               channels.map((channel) => {
                 const outboundRatio = Math.max(0, Math.min(1, 1 - channel.inboundRatio));
@@ -81,12 +79,34 @@ export default function LiquidityPage() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value, isPending = false }: { label: string; value: string; isPending?: boolean }) {
+  const skeletonWidth = label === 'Warnings' ? 'w-8' : 'w-24';
+
   return (
     <button type="button" onClick={() => focusWorkspaceModule('liquidity')} className="rounded-[6px] border border-line bg-panel p-4 text-left transition hover:border-ink-editorial">
       <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-faint">{label}</p>
-      <p className="mt-4 truncate font-mono text-2xl font-black tracking-[-0.03em] text-ink-editorial">{value}</p>
+      {isPending ? <Skeleton className={`mt-4 h-8 ${skeletonWidth}`} /> : <p className="mt-4 truncate font-mono text-2xl font-black tracking-[-0.03em] text-ink-editorial">{value}</p>}
     </button>
+  );
+}
+
+function LiquidityListSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 4 }, (_, index) => (
+        <div key={index} className="rounded-[4px] border border-line bg-panel p-3">
+          <div className="flex items-center justify-between gap-3">
+            <Skeleton className="h-4 w-[11ch]" />
+            <Skeleton className="h-3 w-[8ch]" />
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <Skeleton className="h-3 w-[15ch]" />
+            <Skeleton className="h-3 w-[16ch]" />
+          </div>
+          <Skeleton className="mt-3 h-2 w-[64%] rounded-none" />
+        </div>
+      ))}
+    </>
   );
 }
 

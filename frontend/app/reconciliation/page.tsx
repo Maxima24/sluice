@@ -2,7 +2,7 @@
 
 import { type ReactNode } from 'react';
 import { Database, ListChecks, ShieldAlert, ShieldCheck } from 'lucide-react';
-import { CanvasAppShell, CanvasWorkspace, WorkspaceHeader, WorkspacePanel } from '@/components/canvas-dashboard/CanvasAppShell';
+import { CanvasAppShell, CanvasWorkspace, WorkspaceActionButton, WorkspaceHeader, WorkspacePanel } from '@/components/canvas-dashboard/CanvasAppShell';
 import { useReconciliation } from '@/lib/queries/reconciliation';
 import { focusWorkspaceModule } from '@/lib/workspace';
 import { formatCkb, truncateId } from '@/lib/format';
@@ -21,14 +21,13 @@ export default function ReconciliationPage() {
           title="Reconciliation"
           description="The Fiber node is the source of truth. Drift is surfaced inside the Operator Console and mapped to the workspace audit module."
           action={
-            <button
-              type="button"
+            <WorkspaceActionButton
+              variant="panel"
               onClick={() => focusWorkspaceModule('reconciliation')}
-              className="hidden h-11 shrink-0 items-center gap-2 rounded-[4px] border border-line bg-panel px-3 text-xs font-black uppercase tracking-[0.12em] text-ink-editorial transition hover:border-ink-editorial sm:flex"
+              icon={<ListChecks className="h-4 w-4" />}
             >
-              <ListChecks className="h-4 w-4" />
               Inspect
-            </button>
+            </WorkspaceActionButton>
           }
         />
 
