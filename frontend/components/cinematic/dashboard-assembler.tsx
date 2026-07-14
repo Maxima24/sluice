@@ -8,12 +8,12 @@ import {
   FiArrowUpRight,
   FiDatabase,
   FiGitBranch,
-  FiHardDrive,
   FiRefreshCw,
   FiSearch,
   FiServer,
   FiShield,
 } from 'react-icons/fi';
+import { FiberLogo } from '@/components/brand/FiberLogo';
 import { LiveStatus } from '@/components/live-status';
 import { formatCkb, formatPercent, sumShannon, truncateId } from '@/lib/format';
 import type { ChannelHealthDto } from '@/types/fiber';
@@ -164,13 +164,7 @@ function DashboardSidebar() {
   return (
     <aside className="border-b border-white/10 bg-black/84 p-5 backdrop-blur-xl lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:p-6">
       <div className="mb-8 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center border border-white/16 bg-white/[0.04]">
-          <FiHardDrive className="h-5 w-5 text-white/72" />
-        </div>
-        <div>
-          <p className="text-base font-semibold text-white">Sluice</p>
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/42">Fiber OS</p>
-        </div>
+        <FiberLogo tone="light" showWordmark />
       </div>
       <nav className="grid gap-2">
         {items.map((item) => {

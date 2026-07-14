@@ -96,7 +96,7 @@ modules/rebalance/
   repositories/rebalance-job.repository.ts   # Prisma; FOR UPDATE by idempotencyKey
   mappers/rebalance.mapper.ts
   dto/rebalance-request.dto.ts (Zod)  dto/rebalance-job.dto.ts
-  queues/rebalance.queue.ts            # BullMQ queue + processor; standalone worker.ts entry
+  queues/rebalance.queue.ts            # BullMQ queue + inline processor (RUN_WORKER_INLINE)
 modules/ledger/
   ledger.module.ts  ledger.public.ts
   repositories/ledger.repository.ts    # writeDoubleEntry(job, tx) with balanced assertion
@@ -140,8 +140,10 @@ modules/reconciliation/
 
 ---
 
-## Deployment (built out at the end)
+## Deployment
 
-- **Backend → Render Web Service**: `pnpm --filter backend build`; start `node dist/main`; release `prisma migrate deploy`; health `/health`; env `DATABASE_URL` (Render Postgres), `REDIS_URL` (Render Key Value/Upstash), `CORS_ORIGINS`, `FIBER_RPC_URL`/`FIBER_WS_URL` (private to the node host), `DASHBOARD_SECRET`. WS gateway + inline worker on a single instance, or a dedicated Background Worker when `RUN_WORKER_INLINE=false`.
-- **Frontend → Vercel/Render (separate)**: `output:'standalone'`; env `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL`.
-- **FNN node**: persistent host / private network; **biscuit auth** (or the dev socat proxy) to expose RPC; never publish `8227`/`8299` unauthenticated.
+Live on a single VPS via **Dokploy** (Docker images for both apps) — see [`DEPLOYMENT.md`](./DEPLOYMENT.md) for the full guide; summary:
+
+- **Backend** (`api.sluice.drreamer.digital`): root `Dockerfile`; `prisma migrate deploy` on start; `node backend/dist/main.js`; health `/health`; env `DATABASE_URL` (**Neon**), `REDIS_URL` (**Upstash**), `CORS_ORIGINS`, `FIBER_RPC_URL`/`FIBER_WS_URL` = `http://127.0.0.1:8299` (node on the same host, loopback), `DASHBOARD_SECRET`. WS gateway + inline worker + poller on one instance (`RUN_WORKER_INLINE=true`); a standalone worker entry is not yet built.
+- **Frontend** (`sluice.drreamer.digital`): `frontend/Dockerfile`, `output:'standalone'`; `NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_WS_URL` baked as build args.
+- **FNN node**: same VPS; RPC bound to loopback (`127.0.0.1:8299`) so it is never public; only P2P `8228` is exposed. Render + Vercel remain a supported alternative (`render.yaml`).

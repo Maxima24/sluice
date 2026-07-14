@@ -4,10 +4,44 @@ import type { Envelope } from '@/types/api';
 const base = env.NEXT_PUBLIC_API_URL.replace(/\/$/, '');
 const url = (path: string) => `${base}/${path.replace(/^\//, '')}`;
 
+const SECRET_KEY = 'fiber-dashboard-secret';
+
+/**
+ * The operator secret for mutating calls (POST /rebalance). When the API is
+ * locked (DASHBOARD_SECRET set server-side), the operator enters this once; it
+ * lives only in this browser's localStorage and is sent as `X-Dashboard-Secret`
+ * — never baked into the public bundle. Reads never need it.
+ */
+export const dashboardAuth = {
+  get(): string {
+    if (typeof window === 'undefined') return '';
+    try {
+      return window.localStorage.getItem(SECRET_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  },
+  set(value: string): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const v = value.trim();
+      if (v) window.localStorage.setItem(SECRET_KEY, v);
+      else window.localStorage.removeItem(SECRET_KEY);
+    } catch {
+      /* private-mode / storage disabled — non-fatal */
+    }
+  },
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const secret = dashboardAuth.get();
   const res = await fetch(url(path), {
     ...init,
-    headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
+    headers: {
+      'content-type': 'application/json',
+      ...(secret ? { 'x-dashboard-secret': secret } : {}),
+      ...(init?.headers ?? {}),
+    },
   });
   const body = (await res.json().catch(() => null)) as (Envelope<T> & { message?: string }) | null;
   if (!res.ok) throw new Error(body?.message ?? `HTTP ${res.status}`);

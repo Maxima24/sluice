@@ -27,7 +27,16 @@ export function ChannelList({ data, isPending }: { data?: ChannelHealth; isPendi
         {isPending ? (
           <div className="space-y-2">
             {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 rounded-lg" />
+              <div key={i} className="rounded-lg border border-outline bg-surface px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Skeleton className="h-4 w-[18ch]" />
+                    <Skeleton className="h-5 w-[10ch]" />
+                  </div>
+                  <Skeleton className="h-4 w-[16ch]" />
+                </div>
+                <Skeleton className="mt-2.5 h-2 w-[68%]" />
+              </div>
             ))}
           </div>
         ) : !hasChannels ? (
