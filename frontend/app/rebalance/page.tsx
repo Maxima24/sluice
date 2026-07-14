@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowRight, RefreshCw, Scale } from 'lucide-react';
-import { CanvasAppShell, CanvasWorkspace, WorkspaceHeader, WorkspacePanel } from '@/components/canvas-dashboard/CanvasAppShell';
+import { CanvasAppShell, CanvasWorkspace, WorkspaceActionButton, WorkspaceHeader, WorkspacePanel } from '@/components/canvas-dashboard/CanvasAppShell';
 import { useChannelHealth } from '@/lib/queries/channels';
 import { useCreateRebalance, useRebalanceJob } from '@/lib/queries/rebalance';
 import { dashboardAuth } from '@/lib/api/client';
@@ -10,6 +10,7 @@ import { rebalanceSchema } from '@/lib/rebalance-schema';
 import { focusWorkspaceModule } from '@/lib/workspace';
 import { formatCkb, truncateId } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/Skeleton';
 import type { RebalanceRequest } from '@/types/fiber';
 
 const STEPS = ['PENDING', 'BUILDING', 'INFLIGHT', 'SUCCEEDED'] as const;
@@ -69,17 +70,16 @@ export default function RebalancePage() {
           title="Rebalancing"
           description="Move liquidity from over-funded channels to depleted channels while keeping every circular payment idempotent and auditable."
           action={
-            <button
-              type="button"
+            <WorkspaceActionButton
+              variant="panel"
               onClick={() => {
                 setKey(crypto.randomUUID());
                 focusWorkspaceModule('rebalance');
               }}
-              className="hidden h-11 shrink-0 items-center gap-2 rounded-[4px] border border-line bg-panel px-3 text-xs font-black uppercase tracking-[0.12em] text-ink-editorial transition hover:border-ink-editorial sm:flex"
+              icon={<RefreshCw className="h-4 w-4" />}
             >
-              <RefreshCw className="h-4 w-4" />
               New key
-            </button>
+            </WorkspaceActionButton>
           }
         />
 
@@ -135,13 +135,13 @@ export default function RebalancePage() {
               disabled={create.isPending}
               className="flex h-11 w-full items-center justify-center gap-2 rounded-[4px] border border-ink-editorial bg-ink-editorial text-sm font-black uppercase tracking-[0.12em] text-panel transition hover:bg-ink-hover disabled:opacity-55"
             >
-              {create.isPending ? 'Queuing rebalance' : 'Queue rebalance'}
+              <span>{create.isPending ? 'Queuing rebalance' : 'Queue rebalance'}</span>
               <ArrowRight className="h-4 w-4" />
             </button>
           </form>
         </WorkspacePanel>
 
-        <WorkspacePanel className="mt-4">
+        <WorkspacePanel className="mt-4" data-no-magnetic>
           <div className="mb-5 flex items-center justify-between">
             <div>
               <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-faint">job</p>
@@ -150,7 +150,7 @@ export default function RebalancePage() {
             <JobBadge status={current?.status} />
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             {STEPS.map((step, index) => {
               const active = current ? index <= currentIndex || current.status === 'SUCCEEDED' : false;
               const failed = current?.status === 'FAILED' && index >= 2;
@@ -158,14 +158,14 @@ export default function RebalancePage() {
                 <button
                   key={step}
                   type="button"
+                  data-no-magnetic
                   onClick={() => focusWorkspaceModule('rebalance')}
                   className={cn(
-                    'rounded-[4px] border p-3 text-left transition hover:border-ink-editorial',
+                    'min-h-[72px] rounded-[26px] border px-4 py-3 text-left transition hover:border-ink-editorial',
                     active ? 'border-ink-editorial bg-shell-muted' : failed ? 'border-ink-editorial bg-shell-muted' : 'border-line bg-panel',
                   )}
                 >
-                  <span className={cn('block h-2 w-2 rounded-full', active || failed ? 'bg-ink-editorial' : 'bg-faint')} />
-                  <p className="mt-4 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-copy">{step}</p>
+                  <p className={cn('font-mono text-[10px] font-bold uppercase tracking-[0.18em]', active || failed ? 'text-ink-editorial' : 'text-copy')}>{step}</p>
                 </button>
               );
             })}
@@ -191,12 +191,22 @@ export default function RebalancePage() {
         <WorkspacePanel className="mt-4">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-black uppercase tracking-[0.08em]">Channel candidates</h2>
-            <span className="rounded-[4px] border border-line px-2 py-1 font-mono text-[10px] text-copy">
+            <span className="rounded-[18px] border border-line px-3 py-1.5 font-mono text-[10px] text-copy">
               {channels.length} channels
             </span>
           </div>
           <div className="space-y-2">
-            {channels.length === 0 ? (
+            {health.isPending ? (
+              Array.from({ length: 4 }, (_, index) => (
+                <div key={index} className="rounded-[4px] border border-line bg-panel p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <Skeleton className="h-4 w-[13ch]" />
+                    <Skeleton className="h-4 w-[7ch]" />
+                  </div>
+                  <Skeleton className="mt-3 h-2 w-[58%] rounded-none" />
+                </div>
+              ))
+            ) : channels.length === 0 ? (
               <p className="rounded-[4px] border border-dashed border-line bg-shell-muted p-4 text-sm leading-6 text-copy">
                 No channels open yet — fund and open a channel to see candidates here.
               </p>
@@ -205,6 +215,7 @@ export default function RebalancePage() {
                 <button
                   key={channel.channelId}
                   type="button"
+                  data-no-magnetic
                   onClick={() => focusWorkspaceModule('channels')}
                   className="block w-full rounded-[4px] border border-line bg-panel p-3 text-left transition hover:border-ink-editorial"
                 >
@@ -268,7 +279,7 @@ function ConsoleInput({
 
 function JobBadge({ status }: { status?: string }) {
   return (
-    <span className="rounded-[4px] border border-line bg-panel px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-copy">
+    <span className="rounded-[18px] border border-line bg-panel px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-copy">
       {status ?? 'Idle'}
     </span>
   );

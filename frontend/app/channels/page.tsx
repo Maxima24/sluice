@@ -1,10 +1,11 @@
 'use client';
 
 import { GitBranch, ListFilter } from 'lucide-react';
-import { CanvasAppShell, CanvasWorkspace, WorkspaceHeader, WorkspacePanel } from '@/components/canvas-dashboard/CanvasAppShell';
+import { CanvasAppShell, CanvasWorkspace, WorkspaceActionButton, WorkspaceHeader, WorkspacePanel } from '@/components/canvas-dashboard/CanvasAppShell';
 import { useChannelHealth } from '@/lib/queries/channels';
 import { focusWorkspaceModule } from '@/lib/workspace';
 import { formatCkb, formatPercent, truncateId } from '@/lib/format';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 export default function ChannelsPage() {
   const health = useChannelHealth();
@@ -18,21 +19,16 @@ export default function ChannelsPage() {
           title="Channels"
           description="Inspect each Fiber channel by state, peer, capacity, outbound availability, and balance direction."
           action={
-            <button
-              type="button"
-              onClick={() => focusWorkspaceModule('channels')}
-              className="hidden h-11 shrink-0 items-center gap-2 rounded-[4px] border border-ink-editorial bg-ink-editorial px-4 text-xs font-black uppercase tracking-[0.12em] text-panel transition hover:bg-ink-hover sm:flex"
-            >
-              <GitBranch className="h-4 w-4" />
+            <WorkspaceActionButton onClick={() => focusWorkspaceModule('channels')} icon={<GitBranch className="h-4 w-4" />}>
               Focus channels
-            </button>
+            </WorkspaceActionButton>
           }
         />
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <Metric label="Channels" value={String(channels.length)} />
-          <Metric label="Source" value={health.data?.source ?? 'Unknown'} />
-          <Metric label="State" value={health.data?.stale ? 'Stale' : health.isPending ? 'Loading' : 'Live'} />
+          <Metric isPending={health.isPending} label="Channels" value={String(channels.length)} />
+          <Metric isPending={health.isPending} label="Source" value={health.data?.source ?? 'Unknown'} />
+          <Metric isPending={health.isPending} label="State" value={health.data?.stale ? 'Stale' : 'Live'} />
         </div>
 
         <WorkspacePanel className="mt-4">
@@ -43,6 +39,8 @@ export default function ChannelsPage() {
           <div className="space-y-2">
             {health.isError ? (
               <Empty text={(health.error as Error)?.message ?? 'Channel health unavailable.'} />
+            ) : health.isPending ? (
+              <ChannelListSkeleton />
             ) : channels.length ? (
               channels.map((channel) => (
                 <button
@@ -78,12 +76,36 @@ export default function ChannelsPage() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value, isPending = false }: { label: string; value: string; isPending?: boolean }) {
+  const skeletonWidth = label === 'Source' ? 'w-28' : label === 'Channels' ? 'w-8' : 'w-12';
+
   return (
     <button type="button" onClick={() => focusWorkspaceModule('channels')} className="rounded-[6px] border border-line bg-panel p-4 text-left transition hover:border-ink-editorial">
       <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-faint">{label}</p>
-      <p className="mt-4 truncate font-mono text-2xl font-black tracking-[-0.03em] text-ink-editorial">{value}</p>
+      {isPending ? <Skeleton className={`mt-4 h-8 ${skeletonWidth}`} /> : <p className="mt-4 truncate font-mono text-2xl font-black tracking-[-0.03em] text-ink-editorial">{value}</p>}
     </button>
+  );
+}
+
+function ChannelListSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 4 }, (_, index) => (
+        <div key={index} className="rounded-[4px] border border-line bg-panel p-3">
+          <div className="flex items-center justify-between gap-3">
+            <Skeleton className="h-4 w-[11ch]" />
+            <Skeleton className="h-6 w-[8ch]" />
+          </div>
+          <Skeleton className="mt-3 h-3 w-[18ch]" />
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <Skeleton className="h-3 w-[9ch]" />
+            <Skeleton className="h-3 w-[8ch]" />
+            <Skeleton className="h-3 w-[5ch]" />
+          </div>
+          <Skeleton className="mt-3 h-2 w-[72%] rounded-none" />
+        </div>
+      ))}
+    </>
   );
 }
 

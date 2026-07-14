@@ -58,7 +58,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       ) : (
         leadingIcon
       )}
-      {children}
+      <span className="relative z-10 inline-flex min-w-0 items-center justify-center gap-2">
+        {children}
+      </span>
       {!loading && trailingIcon}
     </button>
   );
