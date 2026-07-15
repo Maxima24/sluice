@@ -62,6 +62,11 @@ export class RebalanceService implements IRebalanceService {
     return j ? toRebalanceJobDto(j) : null;
   }
 
+  async list(limit = 50): Promise<RebalanceJobDto[]> {
+    const jobs = await this.repo.list(limit);
+    return jobs.map(toRebalanceJobDto);
+  }
+
   private isRetryable(e: unknown): boolean {
     return (
       e instanceof Prisma.PrismaClientKnownRequestError &&

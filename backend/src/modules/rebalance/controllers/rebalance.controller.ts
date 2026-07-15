@@ -25,6 +25,12 @@ export class RebalanceController {
     return this.service.request(body);
   }
 
+  @Get()
+  @ResponseMessage('Rebalance history')
+  list() {
+    return this.service.list();
+  }
+
   @Get(':id')
   @ResponseMessage('Rebalance job')
   async getJob(@Param('id') id: string) {
