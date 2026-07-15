@@ -20,6 +20,11 @@ export class RebalanceJobRepository {
     return this.prisma.rebalanceJob.findUnique({ where: { id } });
   }
 
+  /** Recent jobs, newest first — the audit history surface. */
+  list(limit = 50): Promise<RebalanceJob[]> {
+    return this.prisma.rebalanceJob.findMany({ orderBy: { createdAt: 'desc' }, take: limit });
+  }
+
   update(
     id: string,
     status: RebalanceStatus,

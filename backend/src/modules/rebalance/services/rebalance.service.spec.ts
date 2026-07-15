@@ -22,7 +22,7 @@ function makeJob(over: Partial<RebalanceJob> = {}): RebalanceJob {
 }
 
 function setup() {
-  const repo = { findByIdempotencyKey: vi.fn(), create: vi.fn(), findById: vi.fn() };
+  const repo = { findByIdempotencyKey: vi.fn(), create: vi.fn(), findById: vi.fn(), list: vi.fn() };
   const queue = { enqueue: vi.fn().mockResolvedValue(undefined) };
   const prisma = { $transaction: vi.fn(async (cb: (tx: unknown) => unknown) => cb({})) };
   const service = new RebalanceService(prisma as never, repo as never, queue as never);
@@ -88,5 +88,18 @@ describe('RebalanceService.request (idempotency + concurrency, hard rule #3)', (
 
     await expect(service.request(input)).rejects.toThrow('boom');
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('RebalanceService.list (audit history)', () => {
+  it('returns recent jobs mapped to DTOs, newest first', async () => {
+    const { service, repo } = setup();
+    repo.list.mockResolvedValue([makeJob({ id: 'j1' }), makeJob({ id: 'j2', status: 'SUCCEEDED' })]);
+
+    const dtos = await service.list();
+
+    expect(dtos.map((d) => d.id)).toEqual(['j1', 'j2']);
+    expect(dtos[1].status).toBe('SUCCEEDED');
+    expect(dtos[0].amount).toBe('100'); // decimal string via the mapper
   });
 });
