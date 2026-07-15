@@ -40,4 +40,9 @@ export class AppConfig {
   get authOpen(): boolean {
     return this.get('AUTH_OPEN');
   }
+
+  /** Demo mode: simulate a settled rebalance (no node call, no funds moved). */
+  get rebalanceSimulate(): boolean {
+    return this.get('REBALANCE_SIMULATE');
+  }
 }
