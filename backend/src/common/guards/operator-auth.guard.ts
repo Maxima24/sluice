@@ -13,10 +13,12 @@ const PUBLIC_PREFIXES = ['/health', '/auth'];
  *
  * Reads (`GET`/`HEAD`/`OPTIONS`), `/health`, and `/auth/*` are always public.
  * For mutations the order is:
- *   1. a valid wallet session — `Authorization: Bearer <jwt>` whose `sub` is an
+ *   1. a valid wallet session — `Authorization: Bearer <jwt>`. In open mode
+ *      (`AUTH_OPEN=true`) any minted session passes; otherwise `sub` must be an
  *      allowlisted operator key (`OPERATOR_KEYS`);
  *   2. break-glass — `x-dashboard-secret` matching `DASHBOARD_SECRET`;
- *   3. dev default — if neither wallet auth nor the secret is configured, allow.
+ *   3. dev default — if open mode is off and neither the allowlist nor the
+ *      secret is configured, allow.
  * Otherwise `401`.
  */
 @Injectable()
@@ -32,11 +34,12 @@ export class OperatorAuthGuard implements CanActivate {
     if (SAFE_METHODS.has(req.method.toUpperCase())) return true;
     if (PUBLIC_PREFIXES.some((p) => req.path === p || req.path.startsWith(`${p}/`))) return true;
 
+    const open = this.config.authOpen;
     const operatorKeys = this.config.operatorKeys;
     const secret = this.config.get('DASHBOARD_SECRET');
 
-    // 1) wallet session (primary)
-    if (operatorKeys.length > 0 && (await this.hasValidSession(req, operatorKeys))) {
+    // 1) wallet session (primary) — open mode accepts any verified session
+    if ((open || operatorKeys.length > 0) && (await this.hasValidSession(req, open, operatorKeys))) {
       return true;
     }
 
@@ -44,12 +47,12 @@ export class OperatorAuthGuard implements CanActivate {
     if (secret && req.header('x-dashboard-secret') === secret) return true;
 
     // 3) dev default — nothing configured, allow all
-    if (operatorKeys.length === 0 && !secret) return true;
+    if (!open && operatorKeys.length === 0 && !secret) return true;
 
     throw new UnauthorizedException('Operator authentication required');
   }
 
-  private async hasValidSession(req: Request, operatorKeys: string[]): Promise<boolean> {
+  private async hasValidSession(req: Request, open: boolean, operatorKeys: string[]): Promise<boolean> {
     const header = req.header('authorization');
     const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
     if (!token) return false;
@@ -59,7 +62,8 @@ export class OperatorAuthGuard implements CanActivate {
 
     try {
       const payload = await this.jwt.verifyAsync<{ sub?: string }>(token, { secret });
-      return !!payload?.sub && operatorKeys.includes(payload.sub);
+      // Open mode: any JWT we minted is enough; closed mode: sub must be allowlisted.
+      return !!payload?.sub && (open || operatorKeys.includes(payload.sub));
     } catch {
       return false;
     }

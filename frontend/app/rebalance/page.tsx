@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowRight, RefreshCw, Scale } from 'lucide-react';
 import { CanvasAppShell, CanvasWorkspace, WorkspaceActionButton, WorkspaceHeader, WorkspacePanel } from '@/components/canvas-dashboard/CanvasAppShell';
 import { useChannelHealth } from '@/lib/queries/channels';
-import { useCreateRebalance, useRebalanceJob } from '@/lib/queries/rebalance';
+import { useCreateRebalance, useLedger, useRebalanceHistory, useRebalanceJob } from '@/lib/queries/rebalance';
 import { dashboardAuth } from '@/lib/api/client';
 import { rebalanceSchema } from '@/lib/rebalance-schema';
 import { focusWorkspaceModule } from '@/lib/workspace';
@@ -39,6 +39,20 @@ export default function RebalancePage() {
   const job = useRebalanceJob(jobId);
   const current = job.data ?? create.data ?? null;
   const currentIndex = current ? STEPS.indexOf(current.status as (typeof STEPS)[number]) : -1;
+
+  // Audit history + double-entry ledger for the selected job.
+  const history = useRebalanceHistory();
+  const historyJobs = history.data ?? [];
+  const [pickedJobId, setPickedJobId] = useState<string | null>(null);
+  const selectedJobId = pickedJobId ?? jobId ?? historyJobs[0]?.id ?? null;
+  const ledger = useLedger(selectedJobId);
+  const ledgerRows = ledger.data ?? [];
+  const sumBy = (pred: (e: (typeof ledgerRows)[number]) => boolean) =>
+    ledgerRows.filter(pred).reduce((acc, e) => acc + BigInt(e.amount), BigInt(0));
+  const outSum = sumBy((e) => e.direction === 'OUTBOUND');
+  const inSum = sumBy((e) => e.direction === 'INBOUND');
+  const feeSum = sumBy((e) => e.entryType === 'FEE');
+  const balanced = ledgerRows.length > 0 && outSum === inSum + feeSum;
 
   useEffect(() => {
     if (idempotencyKey) return;
@@ -228,6 +242,88 @@ export default function RebalancePage() {
                   </div>
                 </button>
               ))
+            )}
+          </div>
+        </WorkspacePanel>
+
+        <WorkspacePanel className="mt-4" data-no-magnetic>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-black uppercase tracking-[0.08em]">History &amp; audit ledger</h2>
+            <span className="rounded-[4px] border border-line px-2 py-1 font-mono text-[10px] text-copy">
+              {historyJobs.length} jobs
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {history.isPending ? (
+              <Skeleton className="h-12 rounded-[4px]" />
+            ) : historyJobs.length === 0 ? (
+              <p className="rounded-[4px] border border-dashed border-line bg-shell-muted p-4 text-sm leading-6 text-copy">
+                No rebalances yet — queue one above and it will appear here.
+              </p>
+            ) : (
+              historyJobs.map((entry) => (
+                <button
+                  key={entry.id}
+                  type="button"
+                  data-no-magnetic
+                  onClick={() => setPickedJobId(entry.id)}
+                  className={cn(
+                    'flex w-full items-center justify-between gap-3 rounded-[4px] border bg-panel px-3 py-2.5 text-left transition',
+                    selectedJobId === entry.id ? 'border-ink-editorial' : 'border-line hover:border-ink-editorial',
+                  )}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-mono text-xs text-ink-editorial">{truncateId(entry.id, 6, 4)}</p>
+                    <p className="mt-1 truncate font-mono text-[10px] text-copy">
+                      {truncateId(entry.sourceChannelId, 5, 3)} → {truncateId(entry.destChannelId, 5, 3)} · {formatCkb(entry.amount)}
+                    </p>
+                  </div>
+                  <JobBadge status={entry.status} />
+                </button>
+              ))
+            )}
+          </div>
+
+          <div className="mt-5">
+            <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.24em] text-faint">double-entry ledger</p>
+            {!selectedJobId ? (
+              <p className="text-xs text-copy">Select a job to view its ledger.</p>
+            ) : ledger.isPending ? (
+              <Skeleton className="h-12 rounded-[4px]" />
+            ) : ledgerRows.length === 0 ? (
+              <p className="rounded-[4px] border border-dashed border-line bg-shell-muted p-3 text-xs leading-6 text-copy">
+                No ledger entries yet — a rebalance posts its double-entry rows here once it settles (SUCCEEDED).
+              </p>
+            ) : (
+              <div className="overflow-hidden rounded-[4px] border border-line">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-line bg-shell-muted font-mono text-[10px] uppercase tracking-[0.14em] text-faint">
+                      <th className="px-3 py-2">Direction</th>
+                      <th className="px-3 py-2">Type</th>
+                      <th className="px-3 py-2">Channel</th>
+                      <th className="px-3 py-2 text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ledgerRows.map((row) => (
+                      <tr key={row.id} className="border-b border-line last:border-0">
+                        <td className="px-3 py-2 font-mono text-ink-editorial">{row.direction}</td>
+                        <td className="px-3 py-2 text-copy">{row.entryType}</td>
+                        <td className="px-3 py-2 font-mono text-copy">{truncateId(row.channelId, 5, 3)}</td>
+                        <td className="px-3 py-2 text-right font-mono text-ink-editorial">{formatCkb(row.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line bg-shell-muted px-3 py-2 font-mono text-[10px] text-copy">
+                  <span>
+                    Σ OUT {formatCkb(outSum.toString())} = Σ IN {formatCkb(inSum.toString())} + fee {formatCkb(feeSum.toString())}
+                  </span>
+                  {balanced ? <span className="font-bold text-ink-editorial">✓ balanced</span> : null}
+                </div>
+              </div>
             )}
           </div>
         </WorkspacePanel>

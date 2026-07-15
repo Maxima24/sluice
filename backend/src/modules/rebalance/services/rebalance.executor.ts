@@ -1,5 +1,7 @@
+import { randomBytes } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Prisma, RebalanceStatus, type RebalanceJob } from '@prisma/client';
+import { AppConfig } from '../../../config/app.config';
 import { FIBER_RPC, type IFiberRpcClient } from '../../../infrastructure/fiber-rpc/fiber-rpc.port';
 import type { RouterHop, SendPaymentResponse } from '../../../infrastructure/fiber-rpc/types/payments';
 import { toU128Hex } from '../../../infrastructure/fiber-rpc/u128';
@@ -28,6 +30,7 @@ export class RebalanceExecutor {
     private readonly repo: RebalanceJobRepository,
     @Inject(LEDGER_SERVICE) private readonly ledger: ILedgerService,
     private readonly gateway: RealtimeGateway,
+    private readonly config: AppConfig,
   ) {}
 
   async execute(data: RebalanceJobData): Promise<void> {
@@ -40,6 +43,12 @@ export class RebalanceExecutor {
     const maxFee = BigInt(job.maxFee.toFixed(0));
 
     try {
+      // Demo mode: run the real lifecycle + ledger write, but skip the node.
+      if (this.config.rebalanceSimulate) {
+        await this.simulate(job, amount, maxFee);
+        return;
+      }
+
       await this.repo.update(job.id, RebalanceStatus.BUILDING);
       const router = await this.buildCircularRouter(job, amount);
 
@@ -71,6 +80,29 @@ export class RebalanceExecutor {
       await this.fail(job.id, msg);
       throw err; // let BullMQ record the attempt (retries per job options)
     }
+  }
+
+  /**
+   * DEMO ONLY (REBALANCE_SIMULATE=true): drive the full job lifecycle and write
+   * the real balanced double-entry ledger via settle(), WITHOUT calling the node.
+   * No funds move — the payment hash is synthetic and it is logged as simulated.
+   */
+  private async simulate(job: RebalanceJob, amount: bigint, maxFee: bigint): Promise<void> {
+    const paymentHash = `0x${randomBytes(32).toString('hex')}`;
+
+    await this.repo.update(job.id, RebalanceStatus.BUILDING);
+    this.push(job.id, 'Created', paymentHash);
+    await sleep(800);
+
+    await this.repo.update(job.id, RebalanceStatus.INFLIGHT, { paymentHash });
+    this.push(job.id, 'Inflight', paymentHash);
+    await sleep(800);
+
+    const quoted = amount / 1000n; // small, ≤ maxFee — keeps the ledger balanced
+    const fee = quoted < maxFee ? quoted : maxFee;
+    await this.settle(job, amount, fee, paymentHash);
+    this.push(job.id, 'Success', paymentHash);
+    this.logger.warn(`Rebalance ${job.id} SIMULATED (REBALANCE_SIMULATE=on) — no funds moved`);
   }
 
   private async buildCircularRouter(job: RebalanceJob, amount: bigint): Promise<RouterHop[]> {

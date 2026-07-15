@@ -96,6 +96,17 @@ export interface RebalanceJob {
   updatedAt: string;
 }
 
+/** One row of the double-entry audit ledger for a rebalance. */
+export interface LedgerEntry {
+  id: string;
+  rebalanceJobId: string;
+  channelId: string;
+  direction: 'OUTBOUND' | 'INBOUND';
+  entryType: 'PRINCIPAL' | 'FEE';
+  amount: string; // decimal
+  createdAt: string;
+}
+
 export interface ChannelReconciliation {
   channelId: string;
   inSync: boolean;

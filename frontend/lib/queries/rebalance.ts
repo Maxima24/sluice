@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api/client';
-import type { RebalanceJob, RebalanceRequest } from '@/types/fiber';
+import type { LedgerEntry, RebalanceJob, RebalanceRequest } from '@/types/fiber';
 
 const ACTIVE = new Set(['PENDING', 'BUILDING', 'INFLIGHT']);
 
@@ -21,5 +21,25 @@ export function useRebalanceJob(id: string | null) {
       const status = query.state.data?.status;
       return status && ACTIVE.has(status) ? 2000 : false;
     },
+  });
+}
+
+/** Recent rebalance jobs (audit history), newest first. */
+export function useRebalanceHistory() {
+  return useQuery({
+    queryKey: ['rebalance', 'history'],
+    queryFn: () => api.get<RebalanceJob[]>('rebalance'),
+    refetchInterval: 5000,
+    retry: false,
+  });
+}
+
+/** Double-entry ledger entries for a settled rebalance. */
+export function useLedger(jobId: string | null) {
+  return useQuery({
+    queryKey: ['ledger', jobId],
+    queryFn: () => api.get<LedgerEntry[]>(`ledger/${jobId}`),
+    enabled: !!jobId,
+    retry: false,
   });
 }

@@ -14,11 +14,12 @@ const signature: SignaturePayload = {
   signType: 'JoyId',
 };
 
-function setup(operatorKeys: string[] = [OPERATOR_KEY]) {
+function setup(operatorKeys: string[] = [OPERATOR_KEY], open = false) {
   const nonces = { put: vi.fn(), consume: vi.fn().mockReturnValue('the-signed-message') };
   const jwt = { signAsync: vi.fn().mockResolvedValue('jwt.token.here') };
   const config = {
     operatorKeys,
+    authOpen: open,
     get: vi.fn((k: string) => (k === 'AUTH_JWT_SECRET' ? 'hmac-secret' : k === 'AUTH_SESSION_TTL_H' ? 12 : undefined)),
   };
   const service = new AuthService(config as never, jwt as never, nonces as never);
@@ -67,6 +68,16 @@ describe('AuthService.verify', () => {
     const { service } = setup();
     verifyMessage.mockResolvedValue(false);
     await expect(service.verify('nonce-1', signature)).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('mints a JWT for ANY verified wallet in open mode (allowlist skipped)', async () => {
+    const { service, jwt } = setup([], true); // empty allowlist, AUTH_OPEN=true
+    verifyMessage.mockResolvedValue(true);
+
+    const dto = await service.verify('nonce-1', signature);
+
+    expect(dto.token).toBe('jwt.token.here');
+    expect(jwt.signAsync).toHaveBeenCalledWith({ sub: OPERATOR_KEY }, expect.anything());
   });
 
   it('rejects an expired / already-used nonce (no verification attempted)', async () => {
