@@ -6,8 +6,8 @@ import { cn } from '@/lib/utils';
 export const pillClass =
   'rounded-full border border-white/16 bg-white/[0.06] px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-white/60';
 export const actionButtonClass =
-  'rounded-2xl border border-white/16 bg-white/[0.06] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/60 transition hover:border-white/40 hover:text-white';
-export const primaryButtonClass = 'rounded-2xl border border-white bg-white px-4 py-2 text-xs font-bold text-black transition hover:bg-white/90';
+  'rounded-full border border-white/16 bg-white/[0.06] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/60 transition hover:border-white/90';
+export const primaryButtonClass = 'rounded-full border border-white bg-white px-4 py-2 text-xs font-bold text-black transition hover:bg-white/90';
 
 export function SegmentSwitch({
   value,
