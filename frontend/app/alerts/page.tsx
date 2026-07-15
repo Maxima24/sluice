@@ -3,31 +3,17 @@
 import { AlertTriangle, Bell } from 'lucide-react';
 import { CanvasAppShell, CanvasWorkspace, WorkspaceActionButton, WorkspaceHeader, WorkspacePanel } from '@/components/canvas-dashboard/CanvasAppShell';
 import { useChannelHealth } from '@/lib/queries/channels';
+import { useReconciliation } from '@/lib/queries/reconciliation';
+import { deriveAlerts } from '@/lib/liquidity';
 import { focusWorkspaceModule } from '@/lib/workspace';
-import { formatCkb, truncateId } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 export default function AlertsPage() {
   const health = useChannelHealth();
+  const recon = useReconciliation();
   const channels = health.data?.channels ?? [];
-  const lowOutbound = channels.filter((channel) => 1 - channel.inboundRatio < 0.25);
-  const alerts = [
-    ...lowOutbound.map((channel) => ({
-      id: channel.channelId,
-      title: 'Outbound below operating threshold',
-      detail: `${truncateId(channel.channelId)} has ${formatCkb(channel.outbound, { withUnit: !channel.isUdt })} outbound available.`,
-      target: 'liquidity' as const,
-    })),
-    ...(health.data?.stale
-      ? [
-          {
-            id: 'snapshot-stale',
-            title: 'Channel snapshot is stale',
-            detail: 'The console is reading snapshot data. Confirm live Fiber node connectivity.',
-            target: 'network' as const,
-          },
-        ]
-      : []),
-  ];
+  // Same derivation the canvas Alert Timeline uses, so the two stay consistent.
+  const alerts = deriveAlerts(health.data, recon.data);
 
   return (
     <CanvasAppShell active="alerts" breadcrumb="Liquidity Layer / Alerts">
@@ -45,7 +31,7 @@ export default function AlertsPage() {
 
         <div className="grid gap-3 sm:grid-cols-3">
           <Metric label="Open" value={String(alerts.length)} />
-          <Metric label="Channels" value={String(lowOutbound.length)} />
+          <Metric label="Channels" value={health.data ? String(channels.length) : '—'} />
           <Metric label="Source" value={health.data?.source ?? 'Unknown'} />
         </div>
 
@@ -62,11 +48,14 @@ export default function AlertsPage() {
                 <button
                   key={alert.id}
                   type="button"
-                  onClick={() => focusWorkspaceModule(alert.target)}
+                  onClick={() => focusWorkspaceModule('alerts')}
                   className="block w-full rounded-[4px] border border-line bg-panel p-3 text-left transition hover:border-ink-editorial"
                 >
-                  <p className="font-black uppercase tracking-[0.04em] text-ink-editorial">{alert.title}</p>
-                  <p className="mt-2 text-sm leading-6 text-copy">{alert.detail}</p>
+                  <div className="flex items-center gap-2">
+                    <span className={cn('h-2 w-2 shrink-0 rounded-full', alert.tone === 'danger' ? 'bg-ink-editorial' : 'bg-copy')} />
+                    <p className="font-black uppercase tracking-[0.04em] text-ink-editorial">{alert.text}</p>
+                  </div>
+                  <p className="mt-1 pl-4 font-mono text-[10px] uppercase tracking-[0.16em] text-faint">{alert.tone}</p>
                 </button>
               ))
             ) : (
