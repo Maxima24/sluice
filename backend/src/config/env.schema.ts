@@ -27,8 +27,29 @@ export const EnvSchema = z.object({
     .default('true')
     .transform((v) => v.toLowerCase() === 'true'),
 
-  // ── Security gate (replaces auth) ──
+  // ── Security gate — break-glass fallback for mutations ──
   DASHBOARD_SECRET: z.string().min(1).optional(),
+
+  // ── Operator wallet sign-in (Sign-In-With-CKB via CCC) ──
+  // Allowlist of "<signType>:<identity>" operator keys (comma-separated). When
+  // set, mutating endpoints require a session minted by a matching wallet.
+  OPERATOR_KEYS: z.string().optional(),
+  // HMAC secret for the session JWT — required once OPERATOR_KEYS is set.
+  AUTH_JWT_SECRET: z.string().min(1).optional(),
+  // Session lifetime, hours.
+  AUTH_SESSION_TTL_H: z.coerce.number().int().positive().default(12),
+}).superRefine((env, ctx) => {
+  const hasOperators = (env.OPERATOR_KEYS ?? '')
+    .split(',')
+    .map((k) => k.trim())
+    .filter(Boolean).length > 0;
+  if (hasOperators && !env.AUTH_JWT_SECRET) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['AUTH_JWT_SECRET'],
+      message: 'AUTH_JWT_SECRET is required when OPERATOR_KEYS is set',
+    });
+  }
 });
 
 export type Env = z.infer<typeof EnvSchema>;

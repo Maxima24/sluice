@@ -27,4 +27,12 @@ export class AppConfig {
       .map((o) => o.trim())
       .filter(Boolean);
   }
+
+  /** Allowlisted operator keys ("<signType>:<identity>"). Empty ⇒ wallet auth off. */
+  get operatorKeys(): string[] {
+    return (this.get('OPERATOR_KEYS') ?? '')
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean);
+  }
 }

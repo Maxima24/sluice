@@ -11,10 +11,11 @@ import { RoutingModule } from './modules/routing/routing.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
 import { RebalanceModule } from './modules/rebalance/rebalance.module';
 import { ReconciliationModule } from './modules/reconciliation/reconciliation.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 import { AppController } from './app.controller';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
-import { DashboardSecretGuard } from './common/guards/dashboard-secret.guard';
+import { OperatorAuthGuard } from './common/guards/operator-auth.guard';
 
 @Module({
   imports: [
@@ -30,11 +31,12 @@ import { DashboardSecretGuard } from './common/guards/dashboard-secret.guard';
     LedgerModule,
     RebalanceModule,
     ReconciliationModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: TransformResponseInterceptor },
-    { provide: APP_GUARD, useClass: DashboardSecretGuard },
+    { provide: APP_GUARD, useClass: OperatorAuthGuard },
   ],
 })
 export class AppModule {}

@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Cable, Crosshair, Network, Search, X } from 'lucide-react';
+import { Cable, Check, Crosshair, LogOut, Network, Search, Wallet, X } from 'lucide-react';
+import { ccc } from '@ckb-ccc/connector-react';
 import { focusWorkspaceModule, focusWorkspaceSearch } from '@/lib/workspace';
+import { useOperatorSession } from '@/lib/auth';
+import { truncateId } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 export function Header({ breadcrumb }: { breadcrumb: string }) {
@@ -37,6 +40,8 @@ export function Header({ breadcrumb }: { breadcrumb: string }) {
       <div className="ml-auto flex min-w-0 items-center justify-end gap-2">
         <HeaderChip icon={<Network className="h-3.5 w-3.5" />} label="Node Alpha" min="md" />
         <HeaderChip icon={<Cable className="h-3.5 w-3.5" />} label="CKB Fiber" min="xl" />
+
+        <WalletControl />
 
         <button
           type="button"
@@ -91,6 +96,96 @@ export function Header({ breadcrumb }: { breadcrumb: string }) {
         </button>
       </div>
     </header>
+  );
+}
+
+function WalletControl() {
+  const { open } = ccc.useCcc();
+  const signer = ccc.useSigner();
+  const { session, signIn, signOut } = useOperatorSession();
+  const [address, setAddress] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!signer) return;
+    let alive = true;
+    signer
+      .getRecommendedAddress()
+      .then((addr) => alive && setAddress(addr))
+      .catch(() => alive && setAddress(null));
+    return () => {
+      alive = false;
+    };
+  }, [signer]);
+
+  async function handleSignIn() {
+    if (!signer) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await signIn(signer);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Not connected → open the CCC connect modal (JoyID + others).
+  if (!signer) {
+    return (
+      <button
+        type="button"
+        onClick={() => open()}
+        className="flex h-9 shrink-0 items-center gap-2 rounded-[28px] border border-line bg-shell px-3 text-xs font-black uppercase tracking-[0.12em] text-ink-editorial transition hover:border-ink-editorial sm:h-10"
+      >
+        <Wallet className="h-4 w-4" />
+        <span className="hidden sm:inline">Connect</span>
+      </button>
+    );
+  }
+
+  // Connected + signed in → operator identity + sign out.
+  if (session) {
+    return (
+      <div className="flex shrink-0 items-center gap-1.5">
+        <div className="hidden h-10 items-center gap-2 rounded-[28px] border border-ink-editorial bg-shell px-3 text-ink-editorial md:flex">
+          <Check className="h-3.5 w-3.5" />
+          <span className="font-mono text-[10px] uppercase tracking-[0.16em]">{truncateId(session.address, 6, 4)}</span>
+        </div>
+        <button
+          type="button"
+          aria-label="Sign out"
+          onClick={signOut}
+          className="flex h-9 w-9 items-center justify-center rounded-[28px] border border-line bg-shell text-copy transition hover:border-ink-editorial hover:text-ink-editorial sm:h-10 sm:w-10"
+        >
+          <LogOut className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
+
+  // Connected, not yet signed in → address + sign-in.
+  return (
+    <div className="flex shrink-0 items-center gap-1.5">
+      {address ? (
+        <div className="hidden h-10 items-center gap-2 rounded-[28px] border border-line bg-shell px-3 text-copy lg:flex">
+          <Wallet className="h-3.5 w-3.5" />
+          <span className="font-mono text-[10px] uppercase tracking-[0.16em]">{truncateId(address, 6, 4)}</span>
+        </div>
+      ) : null}
+      <button
+        type="button"
+        onClick={handleSignIn}
+        disabled={busy}
+        title={error ?? undefined}
+        className="flex h-9 items-center gap-2 rounded-[28px] border border-ink-editorial bg-ink-editorial px-3 text-xs font-black uppercase tracking-[0.12em] text-panel transition hover:bg-ink-hover disabled:opacity-55 sm:h-10"
+      >
+        <Wallet className="h-4 w-4" />
+        <span>{busy ? 'Signing…' : 'Sign in'}</span>
+      </button>
+    </div>
   );
 }
 
