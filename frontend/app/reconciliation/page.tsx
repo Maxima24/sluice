@@ -47,7 +47,7 @@ export default function ReconciliationPage() {
               <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-faint">per-channel drift</p>
               <h2 className="mt-1 text-lg font-black uppercase tracking-[0.04em]">Ledger agreement</h2>
             </div>
-            <span className="rounded-[4px] border border-line px-2 py-1 font-mono text-[10px] text-copy">
+            <span className="rounded-full border border-line px-2 py-1 font-mono text-[10px] text-copy">
               {data?.channels.length ?? 0} channels
             </span>
           </div>

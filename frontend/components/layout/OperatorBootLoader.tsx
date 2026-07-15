@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { useGSAP } from '@gsap/react';
 import { gsap } from 'gsap';
 import { MotionPathPlugin } from 'gsap/MotionPathPlugin';
 import { cn } from '@/lib/utils';
+
+gsap.registerPlugin(useGSAP, MotionPathPlugin);
 
 const gridColumns = Array.from({ length: 21 }, (_, index) => index * 80);
 const gridRows = Array.from({ length: 13 }, (_, index) => index * 80);
@@ -151,35 +154,36 @@ export function OperatorBootLoader({ preview = false, variant = DEFAULT_BOOT_VAR
   const [variantIndex, setVariantIndex] = useState(() => (preview ? variant % topologyVariants.length : DEFAULT_BOOT_VARIANT));
 
   // Mount gate: play the boot sequence on refresh/full load only, unless preview mode is enabled.
-  useEffect(() => {
-    if (state !== 'checking') return;
+  useGSAP(
+    () => {
+      if (state !== 'checking') return;
 
-    const frame = window.requestAnimationFrame(() => {
-      if (!preview && bootedInCurrentRuntime) {
-        setState('done');
-        return;
-      }
+      const frame = window.requestAnimationFrame(() => {
+        if (!preview && bootedInCurrentRuntime) {
+          setState('done');
+          return;
+        }
 
-      setVariantIndex(preview ? variant % topologyVariants.length : DEFAULT_BOOT_VARIANT);
-      setState('running');
-    });
+        setVariantIndex(preview ? variant % topologyVariants.length : DEFAULT_BOOT_VARIANT);
+        setState('running');
+      });
 
-    return () => window.cancelAnimationFrame(frame);
-  }, [preview, state, variant]);
+      return () => window.cancelAnimationFrame(frame);
+    },
+    { dependencies: [preview, state, variant], revertOnUpdate: true },
+  );
 
-  useEffect(() => {
+  useGSAP(() => {
     if (state !== 'running' || !rootRef.current) return;
-
-    gsap.registerPlugin(MotionPathPlugin);
 
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const root = rootRef.current;
-
-    const context = gsap.context(() => {
-      const rootRect = root.getBoundingClientRect();
-      const originRevealScale =
-        rootRect.width > 0 && rootRect.height > 0 ? Math.ceil(Math.hypot(rootRect.width, rootRect.height) / 20) + 8 : 140;
-      const reversePathLength = (_index: number, target: Element) => (target as SVGPathElement).getTotalLength();
+    const rootRect = root.getBoundingClientRect();
+    const revealDiameter =
+      rootRect.width > 0 && rootRect.height > 0 ? Math.max(Math.ceil(Math.hypot(rootRect.width, rootRect.height) * 1.8), 2800) : 2800;
+    const collapsedRevealScale = 10 / revealDiameter;
+    const pulseRevealScale = 19 / revealDiameter;
+    const reversePathLength = (_index: number, target: Element) => (target as SVGPathElement).getTotalLength();
 
       // Reduced motion fallback: show the wordmark briefly, then release the app.
       if (reducedMotion) {
@@ -192,13 +196,13 @@ export function OperatorBootLoader({ preview = false, variant = DEFAULT_BOOT_VAR
           })
           .set('[data-boot-content]', { autoAlpha: 1 })
           .set('[data-boot-scrim]', { autoAlpha: 0 })
-          .set('[data-white-gate]', { autoAlpha: 0, scale: 0 })
+          .set('[data-white-gate]', { autoAlpha: 0, width: revealDiameter, height: revealDiameter, scale: collapsedRevealScale })
           .set('[data-boot-word]', { opacity: 1, scale: 1, filter: 'blur(0px)' })
           .to(root, preview ? { opacity: 1, duration: 0.18 } : { opacity: 0, duration: 0.18 }, 0.2);
         return;
       }
 
-      const drawTargets = gsap.utils.toArray<SVGPathElement>('[data-draw]');
+      const drawTargets = Array.from(root.querySelectorAll<SVGPathElement>('[data-draw]'));
       drawTargets.forEach((path) => {
         const length = path.getTotalLength();
         gsap.set(path, { strokeDasharray: length, strokeDashoffset: length });
@@ -223,17 +227,18 @@ export function OperatorBootLoader({ preview = false, variant = DEFAULT_BOOT_VAR
         .set('[data-wordmark-stage]', { scale: 1, y: 0, opacity: 1, transformOrigin: '50% 50%', willChange: 'opacity', force3D: true })
         .set('[data-white-gate]', {
           autoAlpha: 0,
+          width: revealDiameter,
+          height: revealDiameter,
           left: '50%',
           top: '50%',
           xPercent: -50,
           yPercent: -50,
-          scale: 0,
-          borderRadius: '999px',
+          scale: collapsedRevealScale,
+          borderRadius: '50%',
           transformOrigin: '50% 50%',
-          willChange: 'transform, opacity, border-radius',
+          willChange: 'transform, opacity',
           force3D: true,
         })
-        .set('[data-origin-dot]', { scale: 0, opacity: 0, filter: 'blur(10px)' })
         .set('[data-grid-line]', { opacity: 0 })
         .set('[data-node-group]', { scale: 0.54, opacity: 1, filter: 'blur(16px)', transformOrigin: 'center center' })
         .set('[data-node-label]', { clipPath: 'inset(0 100% 0 0)' })
@@ -244,9 +249,9 @@ export function OperatorBootLoader({ preview = false, variant = DEFAULT_BOOT_VAR
         .set('[data-status-value]', { textContent: '0' })
         .set('[data-interface-path]', { opacity: 0 })
         .set('[data-interface-card]', { scaleY: 0, opacity: 1, transformOrigin: 'top center', filter: 'blur(10px)' })
-        // Stage 1: origin dot powers on and pulses once.
-        .to('[data-origin-dot]', { scale: 1, opacity: 1, filter: 'blur(0px)', duration: 0.32, ease: 'sine.out' }, 0.2)
-        .to('[data-origin-dot]', { scale: 1.9, duration: 0.24, yoyo: true, repeat: 1, ease: 'sine.inOut' }, 0.52)
+        // Stage 1: the full-screen reveal disk is scaled down to imitate a tiny origin point.
+        .to('[data-white-gate]', { autoAlpha: 1, scale: collapsedRevealScale, duration: 0.32, ease: 'sine.out' }, 0.2)
+        .to('[data-white-gate]', { scale: pulseRevealScale, duration: 0.24, yoyo: true, repeat: 1, ease: 'sine.inOut' }, 0.52)
         // Stage 2: CAD coordinate expansion and engineering grid reveal.
         .to('[data-construction-x]', { attr: { d: 'M110 280H890' }, duration: 0.5, ease: 'power3.inOut' }, 0.68)
         .to('[data-construction-y]', { attr: { d: 'M500 68V492' }, duration: 0.5, ease: 'power3.inOut' }, 0.68)
@@ -326,9 +331,9 @@ export function OperatorBootLoader({ preview = false, variant = DEFAULT_BOOT_VAR
         .to('[data-construction-b]', { attr: { d: 'M500 280L500 280' }, duration: 0.38, ease: 'power3.inOut' }, 5.08)
         .to('[data-construction-x]', { attr: { d: 'M500 280H500' }, duration: 0.38, ease: 'power3.inOut' }, 5.12)
         .to('[data-construction-y]', { attr: { d: 'M500 280V280' }, duration: 0.38, ease: 'power3.inOut' }, 5.12)
-        // Stage 10: the origin dot becomes the white transition field that reveals the app.
-        .to('[data-origin-dot]', { scale: 2.35, opacity: 1, filter: 'blur(0px)', duration: 0.28, ease: 'power2.out' }, 5.36)
-        .to('[data-white-gate]', { autoAlpha: 1, scale: originRevealScale, borderRadius: '0px', duration: 0.82, ease: 'expo.inOut' }, 5.52)
+        // Stage 10: the scaled-down origin disk returns to its full screen-covering size.
+        .to('[data-white-gate]', { autoAlpha: 1, scale: pulseRevealScale, duration: 0.28, ease: 'power2.out' }, 5.36)
+        .to('[data-white-gate]', { scale: 1, duration: 0.82, ease: 'expo.inOut' }, 5.52)
         .to('[data-boot-scrim]', { autoAlpha: 0, duration: 0.12, ease: 'none' }, 6.04)
         .to('[data-boot-content]', { autoAlpha: 0, duration: 0.2, ease: 'sine.inOut' }, 6.08);
 
@@ -338,10 +343,7 @@ export function OperatorBootLoader({ preview = false, variant = DEFAULT_BOOT_VAR
       } else {
         timeline.to(root, { autoAlpha: 0, duration: 0.64, ease: 'sine.inOut' }, 6.42);
       }
-    }, root);
-
-    return () => context.revert();
-  }, [preview, state, variantIndex]);
+  }, { scope: rootRef, dependencies: [preview, state, variantIndex], revertOnUpdate: true });
 
   if (state === 'done') return null;
 
@@ -413,12 +415,6 @@ export function OperatorBootLoader({ preview = false, variant = DEFAULT_BOOT_VAR
             <path key={path} data-draw data-interface-path d={path} fill="none" stroke="rgba(255,255,255,0.46)" strokeWidth="1" />
           ))}
         </svg>
-
-        {/* Stage 1 origin point. */}
-        <span
-          data-origin-dot
-          className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white"
-        />
 
         {/* Stage 4 route discovery operation log. */}
         <div className="absolute left-[8vw] top-[18vh] w-[min(360px,82vw)] space-y-3 font-mono text-[10px] uppercase tracking-[0.22em] text-white/36">

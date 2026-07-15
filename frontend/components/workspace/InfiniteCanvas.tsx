@@ -405,9 +405,15 @@ export function InfiniteCanvas() {
     height: CANVAS_HEIGHT,
     transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
     transformOrigin: '0 0',
+  };
+
+  const fineGridSize = Math.max(7, 28 * zoom);
+  const majorGridSize = Math.max(28, 112 * zoom);
+  const gridStyle: CSSProperties = {
     backgroundImage:
-      'radial-gradient(circle, rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px)',
-    backgroundSize: '28px 28px, 112px 112px, 112px 112px',
+      'radial-gradient(circle, rgba(255,255,255,0.14) 1px, transparent 1px), linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px)',
+    backgroundPosition: `${pan.x}px ${pan.y}px, ${pan.x}px ${pan.y}px, ${pan.x}px ${pan.y}px`,
+    backgroundSize: `${fineGridSize}px ${fineGridSize}px, ${majorGridSize}px ${majorGridSize}px, ${majorGridSize}px ${majorGridSize}px`,
   };
 
   return (
@@ -421,7 +427,8 @@ export function InfiniteCanvas() {
       onWheel={handleWheel}
       onPointerDown={beginPan}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[length:96px_96px]" />
+      <div className="pointer-events-none absolute inset-0" style={gridStyle} />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.18)_74%,rgba(0,0,0,0.42)_100%)]" />
 
       <div className="absolute left-0 top-0 will-change-transform" style={transformStyle}>
         <ConnectionLayer
