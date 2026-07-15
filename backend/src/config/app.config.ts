@@ -35,4 +35,9 @@ export class AppConfig {
       .map((k) => k.trim())
       .filter(Boolean);
   }
+
+  /** Open mode: any signed-in wallet may operate (demo). */
+  get authOpen(): boolean {
+    return this.get('AUTH_OPEN');
+  }
 }

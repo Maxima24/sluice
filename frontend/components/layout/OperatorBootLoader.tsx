@@ -8,7 +8,6 @@ import { cn } from '@/lib/utils';
 const gridColumns = Array.from({ length: 21 }, (_, index) => index * 80);
 const gridRows = Array.from({ length: 13 }, (_, index) => index * 80);
 const wordmark = ['S', 'l', 'u', 'i', 'c', 'e'];
-const entryLetterIndex = Math.floor(wordmark.length / 2);
 
 // Boot operation copy: one set is selected per reload so the startup feels alive.
 const operationSets = [
@@ -177,7 +176,10 @@ export function OperatorBootLoader({ preview = false, variant = DEFAULT_BOOT_VAR
     const root = rootRef.current;
 
     const context = gsap.context(() => {
-      const { gateScale, viewportOrigin, wordmarkOrigin } = getEntryOrigins(root);
+      const rootRect = root.getBoundingClientRect();
+      const originRevealScale =
+        rootRect.width > 0 && rootRect.height > 0 ? Math.ceil(Math.hypot(rootRect.width, rootRect.height) / 20) + 8 : 140;
+      const reversePathLength = (_index: number, target: Element) => (target as SVGPathElement).getTotalLength();
 
       // Reduced motion fallback: show the wordmark briefly, then release the app.
       if (reducedMotion) {
@@ -218,11 +220,11 @@ export function OperatorBootLoader({ preview = false, variant = DEFAULT_BOOT_VAR
         .set(root, { autoAlpha: 1, yPercent: 0, willChange: 'transform, opacity' })
         .set('[data-boot-scrim]', { autoAlpha: 1 })
         .set('[data-boot-content]', { autoAlpha: 1, scale: 1, x: 0, y: 0, transformOrigin: '50% 50%', willChange: 'opacity', force3D: true })
-        .set('[data-wordmark-stage]', { scale: 1, y: 0, opacity: 1, transformOrigin: wordmarkOrigin, willChange: 'opacity', force3D: true })
+        .set('[data-wordmark-stage]', { scale: 1, y: 0, opacity: 1, transformOrigin: '50% 50%', willChange: 'opacity', force3D: true })
         .set('[data-white-gate]', {
           autoAlpha: 0,
-          left: viewportOrigin.x,
-          top: viewportOrigin.y,
+          left: '50%',
+          top: '50%',
           xPercent: -50,
           yPercent: -50,
           scale: 0,
@@ -287,18 +289,54 @@ export function OperatorBootLoader({ preview = false, variant = DEFAULT_BOOT_VAR
         // Stage 8: dashboard wireframe and interface cards are constructed.
         // .to('[data-interface-path]', { strokeDashoffset: 0, opacity: 0.42, duration: 0.7, stagger: 0.045 }, 3.92)
         // .to('[data-interface-card]', { scaleY: 1, filter: 'blur(0px)', duration: 0.44, stagger: 0.055 }, 4.14)
-        // Stage 9: keep Sluice fixed while the i dot background expands into the app reveal.
-        .to('[data-final-breath]', { scale: 1.24, opacity: 0.82, duration: 0.58, stagger: 0.055, yoyo: true, repeat: 1, ease: 'sine.inOut' }, 4.58)
-        .to('[data-white-gate]', { autoAlpha: 1, scale: gateScale, borderRadius: '0px', duration: 0.92, ease: 'expo.inOut' }, 4.96)
-        .to('[data-boot-scrim]', { autoAlpha: 0, duration: 0.12, ease: 'none' }, 5.66)
-        .to('[data-boot-content]', { autoAlpha: 0, duration: 0.22, ease: 'sine.inOut' }, 5.72)
-        .to('[data-boot-op], [data-origin-dot], [data-route-pulse], [data-network-path], [data-node-group], [data-grid-line], [data-construction-x], [data-construction-y], [data-construction-a], [data-construction-b]', { opacity: 0, duration: 0.5, ease: 'sine.inOut' }, 5.18);
+        // Stage 9: reverse the boot sequence back into the original white origin dot.
+        .to('[data-final-breath]', { scale: 1.2, opacity: 0.84, duration: 0.34, stagger: 0.045, yoyo: true, repeat: 1, ease: 'sine.inOut' }, 4.58)
+        .to(
+          '[data-boot-word]',
+          {
+            y: 30,
+            x: (index) => (index - (wordmark.length - 1) / 2) * -12,
+            opacity: 0,
+            filter: 'blur(10px)',
+            duration: 0.42,
+            stagger: { each: 0.035, from: 'edges' },
+            ease: 'power3.in',
+          },
+          4.78,
+        )
+        .to(
+          '[data-boot-op]',
+          { y: -10, clipPath: 'inset(0 0 0 100%)', opacity: 0, duration: 0.34, stagger: 0.04, ease: 'power2.in' },
+          4.82,
+        )
+        .to('[data-node-label]', { clipPath: 'inset(0 100% 0 0)', duration: 0.25, stagger: 0.035, ease: 'power2.in' }, 4.86)
+        .to('[data-route-pulse]', { opacity: 0, duration: 0.16, ease: 'sine.in' }, 4.9)
+        .to(
+          '[data-node-group]',
+          { scale: 0.48, opacity: 0, filter: 'blur(14px)', duration: 0.42, stagger: { each: 0.045, from: 'end' }, ease: 'power3.in' },
+          4.98,
+        )
+        .to(
+          '[data-network-path]',
+          { strokeDashoffset: reversePathLength, duration: 0.52, stagger: { each: 0.035, from: 'end' }, ease: 'power3.inOut' },
+          4.96,
+        )
+        .to('[data-grid-line]', { opacity: 0, duration: 0.36, stagger: 0.002, ease: 'sine.inOut' }, 5.08)
+        .to('[data-construction-a]', { attr: { d: 'M500 280L500 280' }, duration: 0.38, ease: 'power3.inOut' }, 5.08)
+        .to('[data-construction-b]', { attr: { d: 'M500 280L500 280' }, duration: 0.38, ease: 'power3.inOut' }, 5.08)
+        .to('[data-construction-x]', { attr: { d: 'M500 280H500' }, duration: 0.38, ease: 'power3.inOut' }, 5.12)
+        .to('[data-construction-y]', { attr: { d: 'M500 280V280' }, duration: 0.38, ease: 'power3.inOut' }, 5.12)
+        // Stage 10: the origin dot becomes the white transition field that reveals the app.
+        .to('[data-origin-dot]', { scale: 2.35, opacity: 1, filter: 'blur(0px)', duration: 0.28, ease: 'power2.out' }, 5.36)
+        .to('[data-white-gate]', { autoAlpha: 1, scale: originRevealScale, borderRadius: '0px', duration: 0.82, ease: 'expo.inOut' }, 5.52)
+        .to('[data-boot-scrim]', { autoAlpha: 0, duration: 0.12, ease: 'none' }, 6.04)
+        .to('[data-boot-content]', { autoAlpha: 0, duration: 0.2, ease: 'sine.inOut' }, 6.08);
 
       // Preview mode holds the final composition; production wipes the loader into the app.
       if (preview) {
-        timeline.to('[data-white-gate]', { autoAlpha: 0, duration: 0.64, ease: 'sine.inOut' }, 6.12);
+        timeline.to('[data-white-gate]', { autoAlpha: 0, duration: 0.64, ease: 'sine.inOut' }, 6.56);
       } else {
-        timeline.to(root, { autoAlpha: 0, duration: 0.64, ease: 'sine.inOut' }, 6.02);
+        timeline.to(root, { autoAlpha: 0, duration: 0.64, ease: 'sine.inOut' }, 6.42);
       }
     }, root);
 
@@ -398,10 +436,8 @@ export function OperatorBootLoader({ preview = false, variant = DEFAULT_BOOT_VAR
             className="mx-auto flex w-max max-w-[92vw] justify-center gap-x-[0.01em] text-[clamp(4.2rem,12vw,9rem)] font-black leading-[0.78] tracking-[-0.055em]"
           >
             {wordmark.map((char, index) => {
-              const isEntryLetter = index === entryLetterIndex;
-
               return (
-                <span key={`${char}-${index}`} data-boot-word data-entry-letter={isEntryLetter ? true : undefined} className="inline-block will-change-transform">
+                <span key={`${char}-${index}`} data-boot-word className="inline-block will-change-transform">
                   {char}
                 </span>
               );
@@ -431,36 +467,6 @@ export function OperatorBootLoader({ preview = false, variant = DEFAULT_BOOT_VAR
       <div data-white-gate className="absolute h-5 w-5 rounded-full bg-white opacity-0" />
     </div>
   );
-}
-
-function getEntryOrigins(root: HTMLElement) {
-  const rootRect = root.getBoundingClientRect();
-  const wordmarkStage = root.querySelector<HTMLElement>('[data-wordmark-stage]');
-  const entryLetter = root.querySelector<HTMLElement>('[data-entry-letter]');
-
-  if (!wordmarkStage || !entryLetter || rootRect.width === 0 || rootRect.height === 0) {
-    return {
-      gateScale: 140,
-      viewportOrigin: { x: '50%', y: '50%' },
-      wordmarkOrigin: '50% 50%',
-    };
-  }
-
-  const stageRect = wordmarkStage.getBoundingClientRect();
-  const targetRect = entryLetter.getBoundingClientRect();
-  const targetCenterX = targetRect.left + targetRect.width / 2;
-  const targetCenterY = targetRect.top + targetRect.height * 0.11;
-  const stageX = ((targetCenterX - stageRect.left) / stageRect.width) * 100;
-  const stageY = ((targetCenterY - stageRect.top) / stageRect.height) * 100;
-  const viewportX = ((targetCenterX - rootRect.left) / rootRect.width) * 100;
-  const viewportY = ((targetCenterY - rootRect.top) / rootRect.height) * 100;
-  const gateScale = Math.ceil(Math.hypot(rootRect.width, rootRect.height) / 20) + 8;
-
-  return {
-    gateScale,
-    wordmarkOrigin: `${stageX}% ${stageY}%`,
-    viewportOrigin: { x: `${viewportX}%`, y: `${viewportY}%` },
-  };
 }
 
 function animateCounters(root: HTMLElement) {

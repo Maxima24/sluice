@@ -57,7 +57,8 @@ export class AuthService {
     }
 
     const canonicalKey = `${signature.signType}:${signature.identity}`;
-    if (!this.config.operatorKeys.includes(canonicalKey)) {
+    // Open mode (demo) accepts any verified wallet; closed mode enforces the allowlist.
+    if (!this.config.authOpen && !this.config.operatorKeys.includes(canonicalKey)) {
       // Echo the key so the operator can allowlist it on first-time setup.
       throw new ForbiddenException(`Wallet not authorized. Operator key: ${canonicalKey}`);
     }

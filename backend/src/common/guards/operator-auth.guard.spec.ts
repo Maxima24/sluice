@@ -18,11 +18,19 @@ function guardWith(opts: {
   secret?: string;
   jwtSub?: string;
   jwtThrows?: boolean;
+  open?: boolean;
 }) {
   const config = {
     operatorKeys: opts.operatorKeys ?? [],
+    authOpen: opts.open ?? false,
     get: vi.fn((k: string) =>
-      k === 'DASHBOARD_SECRET' ? opts.secret : k === 'AUTH_JWT_SECRET' ? (opts.operatorKeys?.length ? 'hmac' : undefined) : undefined,
+      k === 'DASHBOARD_SECRET'
+        ? opts.secret
+        : k === 'AUTH_JWT_SECRET'
+          ? opts.operatorKeys?.length || opts.open
+            ? 'hmac'
+            : undefined
+          : undefined,
     ),
   };
   const jwt = {
@@ -77,5 +85,17 @@ describe('OperatorAuthGuard', () => {
   it('allows all mutations when nothing is configured (dev default)', async () => {
     const g = guardWith({});
     expect(await g.canActivate(ctx('POST', '/rebalance'))).toBe(true);
+  });
+
+  it('open mode (AUTH_OPEN) allows any valid session regardless of allowlist', async () => {
+    const g = guardWith({ open: true, jwtSub: 'JoyId:whoever-just-signed-in' });
+    expect(
+      await g.canActivate(ctx('POST', '/rebalance', { authorization: 'Bearer good.jwt' })),
+    ).toBe(true);
+  });
+
+  it('open mode still requires a valid session (no anonymous mutations)', async () => {
+    const g = guardWith({ open: true });
+    await expect(g.canActivate(ctx('POST', '/rebalance'))).rejects.toThrow(UnauthorizedException);
   });
 });
