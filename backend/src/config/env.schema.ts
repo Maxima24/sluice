@@ -26,6 +26,12 @@ export const EnvSchema = z.object({
     .string()
     .default('true')
     .transform((v) => v.toLowerCase() === 'true'),
+  // Demo aid: simulate a settled rebalance (no node call, no funds moved) so the
+  // full lifecycle + double-entry ledger are demoable without on-chain liquidity.
+  REBALANCE_SIMULATE: z
+    .string()
+    .default('false')
+    .transform((v) => v.toLowerCase() === 'true'),
 
   // ── Security gate — break-glass fallback for mutations ──
   DASHBOARD_SECRET: z.string().min(1).optional(),
