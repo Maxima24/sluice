@@ -8,7 +8,7 @@ testnet node** (not a mock).
 
 | Step | Scope | State |
 |------|-------|-------|
-| 0 | Testnet FNN node + infra (Docker) | ✅ live (`node_info` verified via socat proxy on `:8299`) |
+| 0 | Testnet FNN node + infra (Docker) | ✅ live (`node_info` verified on `sluice-fiber:8227`) |
 | 1 | Repo + `FiberRpcClient` (`node` context) | ✅ live (`/node/info\|channels\|peers\|graph`) |
 | 2 | Prisma schema + `channels` snapshots/health | ✅ live (`/channels/health`, `source:'live'`) |
 | 3 | Health dashboard | frontend (base scaffolded; bars land in Step 3) |
@@ -144,6 +144,6 @@ modules/reconciliation/
 
 Live on a single VPS via **Dokploy** (Docker images for both apps) — see [`DEPLOYMENT.md`](./DEPLOYMENT.md) for the full guide; summary:
 
-- **Backend** (`api.sluice.drreamer.digital`): root `Dockerfile`; `prisma migrate deploy` on start; `node backend/dist/main.js`; health `/health`; env `DATABASE_URL` (**Neon**), `REDIS_URL` (**Upstash**), `CORS_ORIGINS`, `FIBER_RPC_URL`/`FIBER_WS_URL` = `http://127.0.0.1:8299` (node on the same host, loopback), `DASHBOARD_SECRET`. WS gateway + inline worker + poller on one instance (`RUN_WORKER_INLINE=true`); a standalone worker entry is not yet built.
+- **Backend** (`api.sluice.drreamer.digital`): root `Dockerfile`; `prisma migrate deploy` on start; `node backend/dist/main.js`; health `/health`; env `DATABASE_URL` (**Neon**), `REDIS_URL` (**Upstash**), `CORS_ORIGINS`, `FIBER_RPC_URL`/`FIBER_WS_URL` = `http://sluice-fiber:8227` (node container on the private `dokploy-network`), `DASHBOARD_SECRET`. WS gateway + inline worker + poller on one instance (`RUN_WORKER_INLINE=true`); a standalone worker entry is not yet built.
 - **Frontend** (`sluice.drreamer.digital`): `frontend/Dockerfile`, `output:'standalone'`; `NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_WS_URL` baked as build args.
-- **FNN node**: same VPS; RPC bound to loopback (`127.0.0.1:8299`) so it is never public; only P2P `8228` is exposed. Render + Vercel remain a supported alternative (`render.yaml`).
+- **FNN node**: same VPS; RPC bound to the container's private address on `dokploy-network` (`sluice-fiber:8227`), never published to the host or the internet; only P2P `8228` is exposed. Render + Vercel remain a supported alternative (`render.yaml`).

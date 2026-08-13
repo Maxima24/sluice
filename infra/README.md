@@ -27,23 +27,32 @@ FIBER_SECRET_KEY_PASSWORD=dev-password \
   docker compose -f infra/docker-compose.fiber.yml up -d
 ```
 
-- **RPC/WS is reached on host port `8299`** via a `socat` sidecar. FNN 0.9.x refuses to
-  bind RPC to a public address without biscuit auth, so the node keeps RPC on its secure
-  default `127.0.0.1:8227` and the sidecar (sharing its netns) forwards `8299 → 127.0.0.1:8227`.
-- Backend `.env`: `FIBER_RPC_URL=http://127.0.0.1:8299`, `FIBER_WS_URL=ws://127.0.0.1:8299`.
-- P2P is on `8228`.
+- **RPC/WS is on `127.0.0.1:8227`** (published loopback-only on the host). P2P is on `8228`.
+- Backend `.env`: `FIBER_RPC_URL=http://127.0.0.1:8227`, `FIBER_WS_URL=ws://127.0.0.1:8227`.
+
+The compose file passes `--rpc-listening-addr fiber-node:8227`. That is load-bearing — FNN's
+own default binds `127.0.0.1:8227` *inside* the container, which no published port can reach.
+You cannot simply use `0.0.0.0`: FNN 0.9.x **exits at startup** with
+
+```
+Cannot listen on a public address without a biscuit public key set in the config.
+```
+
+An RFC1918 address is not "public" to that check (`crates/fiber-lib/src/rpc/mod.rs::is_public_addr`),
+so `hostname: fiber-node` + `--rpc-listening-addr fiber-node:8227` binds the container's own
+private IP — reachable through normal Docker networking, no `socat` sidecar.
 
 Verify:
 ```bash
-curl -s -X POST http://127.0.0.1:8299 -H 'content-type: application/json' \
+curl -s -X POST http://127.0.0.1:8227 -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"node_info","params":[]}'
 # -> result.version, result.pubkey, peers_count > 0
 ```
 
-> **Production note:** the `socat` proxy is dev-only. For a publicly reachable node, set up
-> **biscuit auth** (`rpc.biscuit_public_key` + a Bearer token sent by `FiberRpcClient`) and
-> bind `0.0.0.0` — or co-locate the node with the backend on a private network. Never expose
-> `8227`/`8299` to the internet unauthenticated.
+> **Note:** RPC is unauthenticated, so it must never be published beyond loopback (dev) or a
+> private container network (prod). For a genuinely public node, set up **biscuit auth**
+> (`rpc.biscuit_public_key` + a Bearer token sent by `FiberRpcAdapter`). Never expose `8227`
+> to the internet unauthenticated.
 
 ## 3. Fund the wallet + open a channel (to get non-empty `list_channels`)
 
@@ -61,10 +70,17 @@ is still a healthy state — connectivity is proven by `node_info`).
 
 2. **Connect to a peer and open a channel** via the bundled CLI (talks to the node's RPC inside
    the container):
+   `fnn-cli` defaults to `http://127.0.0.1:8227`, which the node no longer binds — pass the
+   node's own address with `-u`:
    ```bash
-   docker exec -it fiber-node fnn-cli info                 # node + peers
-   docker exec -it fiber-node fnn-cli peer --help          # connect_peer
-   docker exec -it fiber-node fnn-cli channel --help       # open_channel { pubkey, funding_amount, public:true }
+   docker exec -it fiber-node fnn-cli -u http://fiber-node:8227 info           # node + peers
+   docker exec -it fiber-node fnn-cli -u http://fiber-node:8227 peer --help    # connect_peer
+   docker exec -it fiber-node fnn-cli -u http://fiber-node:8227 channel --help # open_channel { pubkey, funding_amount, public:true }
+   ```
+   In production the container name differs and the host is `sluice-fiber`:
+   ```bash
+   docker exec -it compose-transmit-virtual-sensor-7tplo9-fiber-1 \
+     fnn-cli -u http://sluice-fiber:8227 info
    ```
    Poll until `state.state_name == "ChannelReady"`. For **rebalancing** (Step 6) you need **≥ 2**
    channels you control.

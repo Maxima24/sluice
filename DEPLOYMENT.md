@@ -10,15 +10,16 @@ Browser ──► sluice.drreamer.digital        (Next.js frontend, Docker image
            api.sluice.drreamer.digital      (NestJS backend, Docker image on the VPS)
                 │   ├─ DATABASE_URL ─► Neon Postgres
                 │   └─ REDIS_URL ────► Upstash Redis (BullMQ)
-                │  FIBER_RPC_URL = http://127.0.0.1:8299   (loopback — same VPS)
+                │  FIBER_RPC_URL = http://sluice-fiber:8227  (dokploy-network)
                 ▼
            Fiber node (FNN)                  (Docker on the SAME VPS; RPC never public)
 ```
 
 Both apps are Docker images managed by **Dokploy** on one VPS (`152.53.241.136`); the platform's
-reverse proxy terminates TLS for both subdomains. The Fiber node runs on the same host, so the
-backend talks to it over `127.0.0.1:8299` — no tunnel, and port `8299` is **not** open to the
-internet (verified: it refuses external connections).
+reverse proxy terminates TLS for both subdomains. The Fiber node runs on the same host as a
+compose service (`sluice-fiber-node`), and the backend reaches it over the shared
+`dokploy-network` at `sluice-fiber:8227`. RPC is **not** published to the host and **not** open
+to the internet — only containers on `dokploy-network` can reach it.
 
 Everything is env-driven; nothing is hardcoded.
 
@@ -35,8 +36,8 @@ Dokploy: new **Application** → this repo → build type **Dockerfile** (contex
 |-----|-------|
 | `DATABASE_URL` | Neon URL (`postgresql://…neon.tech/…?sslmode=require`) |
 | `REDIS_URL` | Upstash URL (`rediss://default:…@…upstash.io:6379`) |
-| `FIBER_RPC_URL` | `http://127.0.0.1:8299` (node on the same host) |
-| `FIBER_WS_URL` | `ws://127.0.0.1:8299` |
+| `FIBER_RPC_URL` | `http://sluice-fiber:8227` (node container on `dokploy-network`) |
+| `FIBER_WS_URL` | `ws://sluice-fiber:8227` |
 | `CORS_ORIGINS` | `https://sluice.drreamer.digital` |
 | `DASHBOARD_SECRET` | a long random string (see Security) — enables the write gate |
 | `RUN_WORKER_INLINE` | `true` (single instance runs the poller + WS + worker) |
@@ -56,9 +57,21 @@ build time** (Next inlines them), so set them as Dokploy **build args**:
 
 ## 3. The Fiber node (same VPS)
 
-Run `nervos/fiber` via `infra/docker-compose.fiber.yml`. On a shared host, **bind the RPC to
-loopback only** so it is never publicly reachable — change the port mapping to
-`"127.0.0.1:8299:8299"` (P2P `8228` stays public). See `infra/README.md` for the wallet-key step.
+Production runs it as a Dokploy **compose** service (`sluice-fiber-node`). The source of truth is
+`infra/docker-compose.fiber.prod.yml` — Dokploy stores the compose inline, so paste that file into
+the service's Compose editor when it changes. `infra/docker-compose.fiber.yml` is the local-dev
+equivalent (RPC published loopback-only on `127.0.0.1:8227`; P2P `8228` stays public).
+
+Both pass `--rpc-listening-addr <hostname>:8227`, which is load-bearing: FNN's default binds
+`127.0.0.1:8227` *inside* the container and is unreachable from anywhere else, while `0.0.0.0`
+makes FNN **exit at startup** ("Cannot listen on a public address without a biscuit public key").
+Binding the container's own private IP satisfies that check. See `infra/README.md`.
+
+> **History:** this previously used a `socat` sidecar with `network_mode: "service:fiber"` to
+> forward `8299 → 127.0.0.1:8227`. That is not durable — a container sharing another's network
+> namespace cannot start once the target is recreated, so every host reboot risked leaving the
+> proxy permanently dead and all RPC failing with a bare `fetch failed`. It was lost that way
+> twice (2026-07-15, ~2026-08-08) before being replaced.
 
 ---
 

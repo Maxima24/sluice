@@ -1,0 +1,78 @@
+# CKB Fiber Network node (FNN) — PRODUCTION (Dokploy compose service
+# "sluice-fiber-node", project "sluice").
+#
+# This file is the source of truth for what Dokploy runs. Dokploy stores the
+# compose inline (sourceType: raw), so keep the two in sync: paste this file
+# into the service's Compose editor after changing it here.
+#
+# The backend reaches the node at http://sluice-fiber:8227 over dokploy-network.
+#
+# WHY --rpc-listening-addr: FNN 0.9.x refuses to START if RPC binds an
+# unspecified/public address without biscuit auth — `0.0.0.0:8227` exits with
+# "Cannot listen on a public address without a biscuit public key set in the
+# config" (crates/fiber-lib/src/rpc/mod.rs::is_public_addr). Its own default,
+# 127.0.0.1:8227, is only reachable *inside* the container. An RFC1918 address
+# is not "public" to that check, so we bind the container's own private IP:
+# `hostname: sluice-fiber` makes Docker write `<private-ip> sluice-fiber` into
+# /etc/hosts, and FNN resolves that name at startup.
+#
+# This REPLACES the previous socat sidecar (`network_mode: "service:fiber"`,
+# host 8299 -> 127.0.0.1:8227). That sidecar was not durable: a container that
+# shares another container's network namespace cannot start once the target is
+# recreated (new netns), so any host reboot or node recreate left the proxy
+# permanently dead and every RPC call failing with a bare "fetch failed".
+# It was lost that way twice (2026-07-15 and again ~2026-08-08).
+#
+# NOTE: RPC on dokploy-network is unauthenticated and reachable by every other
+# container on that network — same exposure as the old 8299 proxy. Biscuit auth
+# (rpc.biscuit_public_key + a Bearer token from FiberRpcAdapter) remains the
+# hardening follow-up. RPC is not published to the host and not internet-facing.
+services:
+  fiber-keygen:
+    image: alpine:3.20
+    volumes:
+      - fiber-data:/fiber
+    command:
+      - sh
+      - -c
+      - 'mkdir -p /fiber/ckb; if [ ! -s /fiber/ckb/key ]; then head -c 64 /dev/urandom | sha256sum | cut -c1-64 | tr -d "\n" > /fiber/ckb/key; echo "generated new CKB key"; else echo "CKB key already present"; fi'
+    restart: "no"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 64M
+
+  fiber:
+    image: nervos/fiber:0.9.0-rc7
+    hostname: sluice-fiber # Docker maps this to the container's private IP in /etc/hosts
+    command: ["--rpc-listening-addr", "sluice-fiber:8227"]
+    environment:
+      # Value lives in the Dokploy service's Environment tab — never in git.
+      # It encrypts /fiber/ckb/key; changing it makes the existing key unreadable.
+      FIBER_SECRET_KEY_PASSWORD: ${FIBER_SECRET_KEY_PASSWORD:?set in Dokploy Environment}
+      RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      - fiber-data:/fiber
+    depends_on:
+      fiber-keygen:
+        condition: service_completed_successfully
+    networks:
+      dokploy-network:
+        aliases:
+          - sluice-fiber
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          memory: 256M
+
+volumes:
+  fiber-data:
+
+networks:
+  dokploy-network:
+    external: true

@@ -185,7 +185,7 @@ erDiagram
 |---|---|
 | Backend | NestJS 11 · Prisma 7 (`@prisma/adapter-pg`) · PostgreSQL · Redis + BullMQ · `@nestjs/jwt` · Zod · `@ckb-ccc/core` |
 | Frontend | Next.js 16 · React 19 · Tailwind v4 · TanStack Query · `@ckb-ccc/connector-react` · framer-motion / GSAP |
-| Node | `nervos/fiber` FNN `0.9.0-rc7` (JSON-RPC/WS via a socat sidecar) |
+| Node | `nervos/fiber` FNN `0.9.0-rc7` (JSON-RPC/WS on `:8227`) |
 | Infra | pnpm monorepo · Docker · Dokploy on a VPS · Cloudflare |
 
 ```
@@ -263,7 +263,7 @@ See `backend/.env.example` for the full annotated list.
 docker compose -f infra/docker-compose.deps.yml up -d
 mkdir -p infra/fiber/data/ckb
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" | tr -d '\n' > infra/fiber/data/ckb/key
-FIBER_SECRET_KEY_PASSWORD=dev-password docker compose -f infra/docker-compose.fiber.yml up -d   # RPC/WS on :8299
+FIBER_SECRET_KEY_PASSWORD=dev-password docker compose -f infra/docker-compose.fiber.yml up -d   # RPC/WS on 127.0.0.1:8227
 
 # 2) install + build (pnpm workspace)
 pnpm install --frozen-lockfile
@@ -286,7 +286,7 @@ All services run as containers on a VPS under **Dokploy**, joined on a private D
 
 - **Frontend** — Next.js standalone image; `NEXT_PUBLIC_*` are **build args**, `HOSTNAME=0.0.0.0` runtime.
 - **Backend** — root `Dockerfile`; runs `prisma migrate deploy` then `node backend/dist/main.js`. All config is runtime env.
-- **Node** — `nervos/fiber` + socat sidecar; reachable in-cluster as `fiber:8299`. Never exposed publicly.
+- **Node** — `nervos/fiber`, RPC bound to the container's own private address; reachable in-cluster as `sluice-fiber:8227`. Never published to the host or exposed publicly.
 
 ---
 
@@ -339,7 +339,7 @@ GitHub Actions (`.github/workflows/ci.yml`) gates every push/PR: install → bac
 - Browser-wallet **node funding** flow (expose the node's CKB receiving address).
 - Multi-asset (UDT) liquidity views + rebalancing; LSP inbound-liquidity marketplace.
 - Multi-operator roles; Redis-backed sessions/nonces for horizontal scale.
-- Production node exposure via biscuit-auth (replacing the dev socat proxy).
+- Authenticated node RPC via biscuit-auth (today it is unauthenticated on the private Docker network).
 
 ---
 
